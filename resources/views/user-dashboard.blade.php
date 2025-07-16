@@ -16,16 +16,10 @@
             <img
                 src="{{ asset('pictures/uplogo-removebg-preview.png') }}"
                 alt="UP Cebu Logo"
-                class="h-[150px] w-auto object-contain"
+                class="h-[160px] bg-white rounded-full w-auto object-contain"
             >
         </div>
-        <h2 class="text-4xl md:text-4xl font-bold leading-tight text-stroke mb-8" style="color: #7B172E;
-  text-shadow:
-    0 0 10px rgba(255,255,255,0.8),  /* Blurred spread */
-    0 0 10px rgba(255,255,255,0.5);">
-            University of the Philippines Cebu
-        </h2>
-        <h1 class="text-5xl md:text-5xl font-bold leading-tight text-stroke" style="color: #7B172E;
+        <h1 class="text-5xl md:text-5xl font-bold leading-tight" style="color : #7B172E;
   text-shadow:
     0 0 10px rgba(255,255,255,0.8),  /* Blurred spread */
     0 0 10px rgba(255,255,255,0.5);">
@@ -35,40 +29,17 @@
     </div>
 </div>
 
+<!-- Replace the facilities grid section with this -->
 <section id="facilities" class="bg-white py-16">
     <div class="max-w-6xl mx-auto px-4">
         <h2 class="text-3xl font-bold mb-10">Facilities</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Card 1 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/upgym.jpg') }}" alt="Gymnasium" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Gymnasium</p>
-            </div>
-            <!-- Card 2 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/fac.jpg') }}" alt="Classroom" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Classroom</p>
-            </div>
-            <!-- Card 3 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/fac1.jpg') }}" alt="Computer Lab" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Computer Lab</p>
-            </div>
-            <!-- Card 4 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/soccer_field.jpg') }}" alt="Soccer Field" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Soccer Field</p>
-            </div>
-            <!-- Card 5 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/football_field.jpg') }}" alt="Football Field" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Football Field</p>
-            </div>
-            <!-- Card 6 -->
-            <div class="bg-gray-100 rounded-lg shadow p-4">
-                <img src="{{ asset('pictures/facilities/gym.jpg') }}" alt="Gymnasium" class="w-full h-40 object-cover rounded">
-                <p class="mt-4 text-center font-medium">Gymnasium</p>
-            </div>
+            @foreach($facilities as $facility)
+                <div class="bg-gray-100 rounded-lg shadow p-4">
+                    <img src="{{ asset('storage/' . $facility->picture) }}" alt="{{ $facility->facility_name }}" class="w-full h-40 object-cover rounded">
+                    <p class="mt-4 text-start font-medium">{{ $facility->facility_name }}</p>
+                </div>
+            @endforeach
         </div>
 
         <!-- View All Button -->
@@ -82,6 +53,7 @@
         </div>
     </div>
 </section>
+
 @php
     use Carbon\Carbon;
     $today = Carbon::now();
@@ -126,7 +98,7 @@
 
         <!-- View All Button -->
         <div class="mt-8 flex justify-end">
-            <a href="#" class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded shadow transition">
+            <a href="/calendar" class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded shadow transition">
                 View all
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -135,6 +107,9 @@
         </div>
     </div>
 </section>
+
+
+
 <footer class="bg-[#7B172E] text-white py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid-cols-1 md:grid-cols-3 gap-8 flex items-center">
@@ -184,7 +159,7 @@
 
             <!-- Right Column - Reserve Button -->
             <div class="flex justify-end flex-1">
-                <a href="#" class="inline-block bg-white text-[#7B172E] px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors duration-300 whitespace-nowrap">
+                <a href="/registration" class="inline-block bg-white text-[#7B172E] px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors duration-300 whitespace-nowrap">
                     RESERVE NOW →
                 </a>
             </div>
