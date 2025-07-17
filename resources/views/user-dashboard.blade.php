@@ -60,50 +60,131 @@
 @endphp
 
 <section id="calendar" class="bg-white py-16">
-    <div class="max-w-6xl mx-auto px-4">
-        <h2 class="text-3xl font-bold mb-10">Calendar of Activities</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-100 p-6 rounded-lg shadow-md">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mt-[120px]">
+        <!-- Left Section -->
+        <div class="space-y-6">
+            <h1 class="text-3xl font-bold">Calendar of Activities</h1>
 
-            <!-- Date Box -->
-            <div class="flex items-center justify-center border-2 border-blue-500 bg-white p-6 rounded-md">
-                <div class="text-center">
-                    <h1 class="text-[150px] font-extrabold text-[#7B172E] leading-none">
-                        {{ $today->format('d') }}
-                    </h1>
-                <div class="flex justify-center flex-row">
-                    <div class="text-4xl font-bold text-[#7B172E] mr-2">
-                        {{ $today->format('F') }}
-                    </div>
-                    <div class="text-2xl font-semibold text-[#7B172E] mt-1">
-                        | {{ $today->format('Y') }}
-                    </div>
+            <!-- Real Calendar -->
+            @php
+                $month = now()->month;
+                $year = now()->year;
+                $today = date('j');
+                $firstDay = Carbon::createFromDate($year, $month, 1);
+                $startDayOfWeek = $firstDay->dayOfWeek; // 0 = Sunday, 6 = Saturday
+                $daysInMonth = $firstDay->daysInMonth;
+            @endphp
+
+            <div class="bg-white rounded-lg shadow p-4">
+                <h2 class="text-pink-700 font-bold text-xl mb-4">
+                    {{ strtoupper($firstDay->format('F')) }}
+                    <span class="text-sm text-gray-500">{{ $year }}</span>
+                </h2>
+
+                <!-- Weekday Headers -->
+                <div class="grid grid-cols-7 text-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
                 </div>
+
+                <!-- Calendar Grid -->
+                <div class="grid grid-cols-7 text-center gap-1 text-sm font-medium text-gray-700">
+                    {{-- Add empty cells before the 1st day --}}
+                    @for ($i = 0; $i < $startDayOfWeek; $i++)
+                        <div class="py-2"></div>
+                    @endfor
+
+                    {{-- Actual calendar days --}}
+                    @for ($day = 1; $day <= $daysInMonth; $day++)
+                        @php
+                            $isToday = $day == now()->day && $month == now()->month && $year == now()->year;
+                        @endphp
+                        <div class="py-2 {{ $isToday ? 'bg-red-600 text-white rounded-full font-bold' : '' }}">
+                            {{ $day }}
+                        </div>
+                    @endfor
                 </div>
             </div>
 
-            <!-- Events List -->
-            <div class="bg-gray-200 rounded-md p-6">
-                <h3 class="text-3xl font-bold text-[#7B172E] mb-4">Upcoming Events</h3>
-                @for ($i = 0; $i < 5; $i++)
-                    <div class="flex items-start mb-4">
-                        <span class="text-xl mr-2">→</span>
-                        <div>
-                            <p class="font-semibold">Intellectual Property Rights Seminar</p>
-                            <p class="text-sm text-gray-600">January 12, 7AM - 12PM</p>
-                        </div>
-                    </div>
-                @endfor
+            <!-- Reservation Prompt -->
+            <div class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+                <p class="text-gray-700">Do you want to request reservation for use of facilities?</p>
+                <a href="#" class="bg-pink-800 text-white px-4 py-2 rounded shadow hover:bg-pink-700">Reserve Now!</a>
             </div>
         </div>
 
-        <!-- View All Button -->
-        <div class="mt-8 flex justify-end">
-            <a href="/calendar" class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded shadow transition">
-                View all
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
+        <!-- Right Section -->
+        <div class="space-y-6">
+            <h2 class="text-xl font-bold">EVENTS AND RESERVATIONS</h2>
+
+            <div class="bg-white p-4 rounded-lg shadow space-y-4">
+                @php
+
+                    $today = now()->toDateString();
+
+                    // Mock data for layout preview (this can be removed when using actual DB data)
+                    $events = [
+                        ['date' => '2025-07-15', 'title' => 'Assemble Meeting for Upcoming Intramurals', 'time' => '8:00 AM - 10:00 AM', 'venue' => 'Gymnasium'],
+                        ['date' => '2025-07-16', 'title' => 'Intellectual Property Rights Seminar', 'time' => '7:00 AM - 12:00 PM', 'venue' => 'Gymnasium'],
+                        ['date' => '2025-07-17', 'title' => 'Student Body Organization Meeting (4th year only)', 'time' => '8:00 AM - 10:00 AM', 'venue' => 'Gymnasium'],
+                    ];
+
+                    // When using actual DB data:
+                    // $events = Event::orderBy('date')->get();
+
+                    $todayEvent = collect($events)->firstWhere('date', $today);
+                    $otherEvents = collect($events)->filter(fn($e) => $e['date'] !== $today)->sortBy('date')->values();
+                @endphp
+
+                <div class="space-y-4">
+
+                    {{-- Today’s Event (always on top) --}}
+                    @if ($todayEvent)
+                        @php
+                            $eventDate = Carbon::parse($todayEvent['date']);
+                            $dayNum = $eventDate->format('d');
+                            $dayOfWeek = strtoupper($eventDate->format('D'));
+                        @endphp
+                        <div class="flex items-start space-x-4">
+                            <div class="flex flex-col items-center">
+                                <span class="font-bold text-red-600">Today</span>
+                                <span class="text-xs text-gray-500">{{ $dayOfWeek }}</span>
+                                <div class="w-1 h-full bg-black mt-1"></div>
+                            </div>
+                            <div class="bg-gray-300 p-3 rounded w-full">
+                                <p class="font-semibold">{{ $todayEvent['title'] }}</p>
+                                <p class="text-sm text-gray-600">{{ $todayEvent['venue'] }}</p>
+                                <p class="text-sm text-gray-600">{{ $todayEvent['time'] }}</p>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Other Events --}}
+                    @foreach ($otherEvents as $event)
+                        @php
+                            $eventDate = Carbon::parse($event['date']);
+                            $dayNum = $eventDate->format('d');
+                            $dayOfWeek = strtoupper($eventDate->format('D'));
+                        @endphp
+                        <div class="flex items-start space-x-4">
+                            <div class="flex flex-col items-center">
+                                <span class="font-bold">{{ $dayNum }}</span>
+                                <span class="text-xs text-gray-500">{{ $dayOfWeek }}</span>
+                                <div class="w-1 h-full bg-black mt-1"></div>
+                            </div>
+                            <div class="bg-gray-100 p-3 rounded w-full">
+                                <p class="font-semibold">{{ $event['title'] }}</p>
+                                <p class="text-sm text-gray-600">{{ $event['venue'] }}</p>
+                                <p class="text-sm text-gray-600">{{ $event['time'] }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <a href="/calendar_of_activities" class="bg-pink-800 text-white px-6 py-2 rounded shadow hover:bg-pink-700">View Calendar</a>
+            </div>
         </div>
     </div>
 </section>
