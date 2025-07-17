@@ -16,9 +16,9 @@
                 </div>
             </div>
             <div class="sm:ml-6 sm:flex sm:space-x-8">
-                <a href="/Reservation" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="dashboard">Dashboard</a>
+                <a href="/user" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="dashboard">Dashboard</a>
                 <a href="/facilities" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="facilities">Facilities</a>
-                <a href="/calendar" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="calendar">Calendar</a>
+                <a href="/calendar_of_activities" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="calendar">Calendar</a>
                 <a href="/reservation" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="reservation">Reservation</a>
             </div>
         </div>
