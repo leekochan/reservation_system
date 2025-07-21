@@ -3,6 +3,8 @@
 <head>
     @include('partials.head')
     <script src="//unpkg.com/alpinejs" defer></script>
+    <!-- Add this for flash messages -->
+    @include('partials.flash-messages')
 </head>
 
 <body class="bg-gray-50 m-0 p-0">
@@ -30,8 +32,7 @@
                             <button @click="showModal = true">
                                 <img src="{{ asset('pictures/icons/edit.png') }}" alt="Edit" class="w-5 h-5">
                             </button>
-                            {{--                        <form action="{{ route('facilities.destroy', $facility->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete it?')">--}}
-                            <form method="POST" onsubmit="return confirm('Are you sure you want to delete it?')">
+                            <form action="{{ route('facilities.destroy', $facility->facility_id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this facility?')">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit">
@@ -46,21 +47,23 @@
                         <div class="bg-white rounded-lg p-6 w-[90%] max-w-md relative border-2 border-[#7A1D30]">
                             <button @click="showModal = false" class="absolute top-2 right-2 text-black text-xl">&times;</button>
 
-                            {{--                        <form action="{{ route('facilities.update', $facility->id) }}" method="POST" enctype="multipart/form-data">--}}
-                            <form method="POST" enctype="multipart/form-data">
+                            <form action="{{ route('facilities.update', $facility->facility_id) }}" method="POST" enctype="multipart/form-data">
                                 @csrf
                                 @method('PUT')
 
                                 <label class="block font-semibold mb-2">Facility:</label>
-                                <input type="text" name="facility_name" value="{{ $facility->facility_name }}" class="w-full border px-3 py-2 mb-4 rounded">
+                                <input type="text" name="facility_name" value="{{ $facility->facility_name }}" class="w-full border px-3 py-2 mb-4 rounded" required>
 
-                                <label class="block font-semibold mb-2">Image:</label>
+                                <label class="block font-semibold mb-2">Current Image:</label>
+                                <img src="{{ asset('storage/' . $facility->picture) }}" alt="Current Image" class="w-full h-40 object-cover rounded mb-4">
+
+                                <label class="block font-semibold mb-2">Change Image:</label>
                                 <div class="w-full h-40 bg-gray-100 border rounded flex items-center justify-center cursor-pointer mb-4">
-                                    <label for="imageInput{{ $facility->id }}" class="cursor-pointer text-gray-500 text-sm text-center w-full h-full flex flex-col items-center justify-center">
+                                    <label for="imageInput{{ $facility->facility_id }}" class="cursor-pointer text-gray-500 text-sm text-center w-full h-full flex flex-col items-center justify-center">
                                         <img src="{{ asset('pictures/icons/image-icon.png') }}" alt="Upload" class="w-12 h-12 mb-2">
-                                        Upload from a computer
+                                        Upload new image
                                     </label>
-                                    <input type="file" name="picture" id="imageInput{{ $facility->id }}" class="hidden">
+                                    <input type="file" name="picture" id="imageInput{{ $facility->facility_id }}" class="hidden">
                                 </div>
 
                                 <div class="text-center">
@@ -83,14 +86,14 @@
             <div class="bg-white rounded-lg p-6 w-[90%] max-w-md relative border-2 border-[#7A1D30]">
                 <button @click="showAddModal = false" class="absolute top-2 right-2 text-black text-xl">&times;</button>
 
-                <form method="POST" action="/admin/facilities" enctype="multipart/form-data">
+                <form method="POST" action="{{ route('facilities.store') }}" enctype="multipart/form-data">
                     @csrf
 
                     <label class="block font-semibold mb-2">Facility Name:</label>
                     <input type="text" name="facility_name" class="w-full border px-3 py-2 mb-4 rounded" required>
 
-                    <label class="block font-semibold mb-2">Number of Units:</label>
-                    <input type="number" name="units" class="w-full border px-3 py-2 mb-4 rounded" required>
+                    <label class="block font-semibold mb-2">Package:</label>
+                    <input type="text" name="facility_name" class="w-full border px-3 py-2 mb-4 rounded" required>
 
                     <label class="block font-semibold mb-2">Image:</label>
                     <div class="w-full h-40 bg-gray-100 border rounded flex items-center justify-center cursor-pointer mb-4">
@@ -110,5 +113,40 @@
     </div>
 </section>
 
+<!-- Add this script for better file input handling -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // For add modal
+        const newImageInput = document.getElementById('newImageInput');
+        if (newImageInput) {
+            newImageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const label = newImageInput.previousElementSibling;
+                        label.innerHTML = `<img src="${event.target.result}" class="w-full h-full object-cover" alt="Preview">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // For edit modals
+        document.querySelectorAll('[id^="imageInput"]').forEach(input => {
+            input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const label = input.previousElementSibling;
+                        label.innerHTML = `<img src="${event.target.result}" class="w-full h-full object-cover" alt="Preview">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+    });
+</script>
 </body>
 </html>
