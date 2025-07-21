@@ -33,6 +33,13 @@ Route::get('/admin/equipments', [AdminEquipmentsController::class, 'adminEquipme
 Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
 Route::get('/admin/equipments/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments']);
 
+Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
+
+// Functionality routes for facilities (Add, Edit, Delete)
+Route::post('/admin/facilities', [AdminFacilityController::class, 'store'])->name('facilities.store');
+Route::put('/admin/facilities/{id}', [AdminFacilityController::class, 'update'])->name('facilities.update');
+Route::delete('/admin/facilities/{id}', [AdminFacilityController::class, 'destroy'])->name('facilities.destroy');
+
 Route::get('/api/availability/{facilityId}', function($facilityId) {
     $type = request()->query('type', 'single');
     $month = request()->query('month', date('m'));
