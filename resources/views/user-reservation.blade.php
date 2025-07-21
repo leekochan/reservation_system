@@ -171,10 +171,8 @@
         }
 
         .remove-equipment {
-            background-color: #ff4444;
-            color: white;
+            color: black;
             border: none;
-            border-radius: 50%;
             width: 20px;
             height: 20px;
             cursor: pointer;
@@ -250,6 +248,7 @@
                         Please select a facility to see availability
                     </div>
                 </div>
+            </div>
 
             <div id="calendar-container" class="w-full">
                 <label class="block text-gray-700 font-medium mb-2">Available Dates</label>
@@ -340,48 +339,6 @@
         transactionDateInput.value = formatDateForDisplay(today);
         const equipmentRadios = document.querySelectorAll('input[name="need_equipment"]');
         const equipmentContainer = document.getElementById('equipment-container');
-        const equipmentOptions = @json($equipments->map(function($item) {
-            return ['id' => $item->equipment_id, 'name' => $item->equipment_name];
-        }));
-
-        async function fetchAvailableDates(facilityId, reservationType, daysCount = null) {
-            try {
-                const response = await fetch(`/api/availability/${facilityId}?type=${reservationType}&days=${daysCount}`);
-                if (!response.ok) throw new Error('Failed to fetch availability');
-                return await response.json();
-            } catch (error) {
-                console.error('Error fetching availability:', error);
-                return { single: [], consecutive: [] };
-            }
-        }
-
-        renderCalendar();
-
-        // Sample available dates (in real app, this would come from backend)
-        const availableDates = {
-            'auditorium': {
-                single: ['2025-07-16', '2025-07-17', '2025-07-20', '2025-07-22', '2025-07-27'],
-                consecutive: [
-                    ['2025-07-16', '2025-07-17'], // 2 consecutive days
-                    ['2025-07-19', '2025-07-20', '2025-07-21'], // 3 consecutive days
-                    ['2025-07-27', '2025-07-28'] // 2 consecutive days
-                ]
-            },
-            'classroom': {
-                single: ['2025-07-15', '2025-07-16', '2025-07-17', '2025-07-23', '2025-07-30'],
-                consecutive: [
-                    ['2025-07-15', '2025-07-16'],
-                    ['2025-07-22', '2025-07-23', '2025-07-24']
-                ]
-            },
-            'sports-complex': {
-                single: ['2025-07-14', '2025-07-16', '2025-07-24', '2025-07-31'],
-                consecutive: [
-                    ['2025-07-14', '2025-07-15'],
-                    ['2025-07-23', '2025-07-24', '2025-07-25']
-                ]
-            }
-        };
 
         // Initialize calendar
         renderCalendar();
@@ -432,230 +389,202 @@
         });
 
         // Update calendar when facility is selected
-        facilitySelect.addEventListener('change', function() {
+        facilitySelect.addEventListener('change', async function() {
             selectedFacility = this.value;
             selectedDate = null;
             selectedMultipleDates = [];
 
             if (this.value) {
+                const facilityName = this.options[this.selectedIndex].dataset.name;
+                calendarMessage.textContent = `Checking availability for ${facilityName}...`;
+                calendarMessage.style.color = "#ff0038";
+
+                // Reset calendar to current month
+                currentDate = new Date();
+                await renderCalendar();
+
                 calendarMessage.textContent = "Please choose the available date for your reservation";
-                calendarMessage.style.color = "#ff0038"; // Maroon color
-                renderCalendar();
             } else {
                 calendarMessage.textContent = "Please select a facility to see availability";
-                calendarMessage.style.color = ""; // Reset to default
+                calendarMessage.style.color = "";
                 renderCalendar();
             }
         });
 
         // Navigation buttons
-        prevMonthBtn.addEventListener('click', function() {
+        prevMonthBtn.addEventListener('click', async function() {
             currentDate.setMonth(currentDate.getMonth() - 1);
-            renderCalendar();
+            await renderCalendar();
         });
 
-        nextMonthBtn.addEventListener('click', function() {
+        nextMonthBtn.addEventListener('click', async function() {
             currentDate.setMonth(currentDate.getMonth() + 1);
-            renderCalendar();
+            await renderCalendar();
         });
 
         // Render the calendar
-        function renderCalendar() {
+        // Replace the renderCalendar function with this:
+        async function renderCalendar() {
             const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
+            const month = currentDate.getMonth() + 1;
 
-            // Set calendar title
-            calendarTitle.textContent = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(currentDate)} ${year}`;
+            // Show loading state
+            calendarDays.innerHTML = '<div class="col-span-7 py-4 text-center">Loading availability...</div>';
 
-            // Get first day of month and total days in month
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            try {
+                // Fetch availability data from server
+                const response = await fetch(`/api/availability/${selectedFacility}?month=${month}&year=${year}&type=${reservationType}&days=${daysCount}`);
+                const data = await response.json();
 
-            // Get days from previous month
-            const prevMonthDays = new Date(year, month, 0).getDate();
+                // Clear calendar
+                calendarDays.innerHTML = '';
 
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Normalize to midnight
+                // Set calendar title
+                calendarTitle.textContent = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(year, month - 1))} ${year}`;
 
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+                // Get first day of month and total days in month
+                const firstDay = new Date(year, month - 1, 1).getDay();
+                const daysInMonth = new Date(year, month, 0).getDate();
 
-            const dayAfterTomorrow = new Date(today);
-            dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+                // Get days from previous month
+                const prevMonthDays = new Date(year, month - 1, 0).getDate();
 
-            // Clear calendar
-            calendarDays.innerHTML = '';
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
 
-            // Previous month days
-            for (let i = firstDay - 1; i >= 0; i--) {
-                const dayElement = document.createElement('div');
-                dayElement.className = 'calendar-day other-month';
-                dayElement.textContent = prevMonthDays - i;
-                calendarDays.appendChild(dayElement);
-            }
-
-            // Current month days
-            let facilityAvailableDates = [];
-            let consecutiveStartDates = [];
-
-            if (selectedFacility) {
-                if (reservationType === 'single') {
-                    facilityAvailableDates = availableDates[selectedFacility]?.single || [];
-                } else if (reservationType === 'consecutive' && daysCount) {
-                    // Get all consecutive date ranges that match the selected days count
-                    const allConsecutive = availableDates[selectedFacility]?.consecutive || [];
-                    const matchingConsecutive = allConsecutive.filter(range => range.length === daysCount);
-
-                    // Extract just the start dates of these ranges
-                    consecutiveStartDates = matchingConsecutive.map(range => range[0]);
+                // Previous month days
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'calendar-day other-month';
+                    dayElement.textContent = prevMonthDays - i;
+                    calendarDays.appendChild(dayElement);
                 }
-            }
 
-            for (let i = 1; i <= daysInMonth; i++) {
-                const date = new Date(year, month, i);
-                const dateString = formatDate(date);
+                // Current month days
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const date = new Date(year, month - 1, i);
+                    const dateString = formatDate(date);
 
-                // Check if date is today, tomorrow, or in the past
-                const isTooSoon = date < dayAfterTomorrow;
+                    // Check if date is in the past
+                    const isPast = date < today;
 
-                let isAvailable = false;
-                let isConsecutiveStart = false;
-                let isMultipleAvailable = false;
+                    // Check if date is unavailable
+                    const isUnavailable = data.unavailable.includes(dateString);
 
-                if (selectedFacility && !isTooSoon) {
-                    if (reservationType === 'single') {
-                        isAvailable = availableDates[selectedFacility]?.single.includes(dateString);
-                    } else if (reservationType === 'consecutive' && daysCount) {
-                        isConsecutiveStart = availableDates[selectedFacility]?.consecutive.some(range =>
-                            range.length === daysCount && range[0] === dateString
-                        );
-                        isAvailable = isConsecutiveStart;
-                    } else if (reservationType === 'multiple') {
-                        isAvailable = availableDates[selectedFacility]?.single.includes(dateString);
-                        isMultipleAvailable = isAvailable;
+                    // Check if date is start of consecutive range
+                    let isConsecutiveStart = false;
+                    if (reservationType === 'consecutive' && daysCount) {
+                        isConsecutiveStart = data.consecutive.some(range => range[0] === dateString);
                     }
-                }
 
-                // Set class based on availability and date rules
-                let dayClass = 'calendar-day ';
-                if (!selectedFacility) {
-                    dayClass += 'no-facility';
-                } else if (isTooSoon) {
-                    dayClass += 'unavailable';
-                } else {
-                    dayClass += isAvailable ?
-                        (isConsecutiveStart ? 'consecutive-date' :
-                            (isMultipleAvailable ? 'available' : 'available')) :
-                        'unavailable';
-                }
-
-                const dayElement = document.createElement('div');
-                dayElement.className = dayClass;
-                dayElement.textContent = i;
-                dayElement.dataset.date = dateString;
-
-                // Highlight if selected
-                if (reservationType === 'single' && selectedDate === dateString) {
-                    dayElement.classList.add('selected');
-                } else if (reservationType === 'consecutive' && daysCount) {
-                    const allConsecutive = availableDates[selectedFacility]?.consecutive || [];
-                    const selectedRange = allConsecutive.find(range =>
-                        range.length === daysCount && range[0] === selectedDate
-                    );
-                    if (selectedRange && selectedRange.includes(dateString)) {
-                        dayElement.classList.add('consecutive-date');
-                        if (dateString === selectedDate) {
-                            dayElement.classList.add('selected');
-                        }
+                    // Set class based on availability
+                    let dayClass = 'calendar-day ';
+                    if (!selectedFacility) {
+                        dayClass += 'no-facility';
+                    } else if (isPast) {
+                        dayClass += 'unavailable';
+                    } else if (isUnavailable) {
+                        dayClass += 'unavailable';
+                    } else if (isConsecutiveStart) {
+                        dayClass += 'consecutive-date';
+                    } else {
+                        dayClass += 'available';
                     }
-                } else if (reservationType === 'multiple' && selectedMultipleDates.includes(dateString)) {
-                    dayElement.classList.add('multiple-date');
+
+                    const dayElement = document.createElement('div');
+                    dayElement.className = dayClass;
+                    dayElement.textContent = i;
+                    dayElement.dataset.date = dateString;
+
+                    // Only make clickable if available and not in past
+                    if (selectedFacility && !isPast && (isConsecutiveStart || (reservationType !== 'consecutive' && !isUnavailable))) {
+                        dayElement.addEventListener('click', function() {
+                            handleDateSelection(dateString);
+                        });
+                    } else {
+                        dayElement.style.cursor = 'default';
+                    }
+
+                    calendarDays.appendChild(dayElement);
                 }
 
-                if (selectedFacility && isAvailable) {
-                    dayElement.addEventListener('click', function() {
-                        handleDateSelection(dateString);
-                    });
-                } else {
-                    dayElement.style.cursor = 'default';
+                // Next month days (to fill the grid)
+                const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+                const nextMonthDays = totalCells - (firstDay + daysInMonth);
+
+                for (let i = 1; i <= nextMonthDays; i++) {
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'calendar-day other-month';
+                    dayElement.textContent = i;
+                    calendarDays.appendChild(dayElement);
                 }
-
-                calendarDays.appendChild(dayElement);
-            }
-
-            // Next month days (to fill the grid)
-            const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-            const nextMonthDays = totalCells - (firstDay + daysInMonth);
-
-            for (let i = 1; i <= nextMonthDays; i++) {
-                const dayElement = document.createElement('div');
-                dayElement.className = 'calendar-day other-month';
-                dayElement.textContent = i;
-                calendarDays.appendChild(dayElement);
+            } catch (error) {
+                console.error('Error loading calendar:', error);
+                calendarDays.innerHTML = '<div class="col-span-7 py-4 text-center text-red-500">Error loading availability data</div>';
             }
         }
 
         // Handle date selection
         function handleDateSelection(dateString) {
             // Clear previous selections
-            const selectedDays = document.querySelectorAll('.calendar-day.selected, .calendar-day.consecutive-date');
+            const selectedDays = document.querySelectorAll('.calendar-day.selected, .calendar-day.consecutive-date, .calendar-day.multiple-date');
             selectedDays.forEach(day => {
-                day.classList.remove('selected', 'consecutive-date');
+                day.classList.remove('selected', 'consecutive-date', 'multiple-date');
             });
 
             // Mark the selected date(s)
             if (reservationType === 'single') {
-                // For single, just select one date
                 const dayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
                 dayElement.classList.add('selected');
                 selectedDate = dateString;
-
-                // Create or update the date inputs
                 updateDateTimeInputs(dateString);
             }
             else if (reservationType === 'consecutive' && daysCount) {
-                // For consecutive, find the range and select all dates in it
-                const allConsecutive = availableDates[selectedFacility]?.consecutive || [];
-                const selectedRange = allConsecutive.find(range =>
-                    range.length === daysCount && range[0] === dateString
-                );
+                // For consecutive dates, we need to generate the full range
+                const startDate = new Date(dateString);
+                const dateRange = [dateString];
 
-                if (selectedRange) {
-                    // Mark all dates in the range
-                    selectedRange.forEach(dateStr => {
-                        const dayElement = document.querySelector(`.calendar-day[data-date="${dateStr}"]`);
-                        if (dayElement) {
-                            dayElement.classList.add('consecutive-date');
-                        }
-                    });
-
-                    // Mark the first date as selected
-                    const firstDayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
-                    firstDayElement.classList.add('selected');
-                    selectedDate = dateString;
-
-                    // Create or update the date inputs
-                    updateDateTimeInputs(selectedRange);
+                for (let i = 1; i < daysCount; i++) {
+                    const nextDate = new Date(startDate);
+                    nextDate.setDate(startDate.getDate() + i);
+                    dateRange.push(formatDate(nextDate));
                 }
+
+                // Mark all dates in the range
+                dateRange.forEach(dateStr => {
+                    const dayElement = document.querySelector(`.calendar-day[data-date="${dateStr}"]`);
+                    if (dayElement) {
+                        dayElement.classList.add('consecutive-date');
+                    }
+                });
+
+                // Mark the first date as selected
+                const firstDayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
+                firstDayElement.classList.add('selected');
+                selectedDate = dateString;
+
+                // Update both date-time inputs and equipment inputs
+                updateDateTimeInputs(dateRange);
             }
             else if (reservationType === 'multiple') {
                 const dayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
 
-                // Toggle selection
                 if (dayElement.classList.contains('multiple-date')) {
-                    // Remove from selection
                     dayElement.classList.remove('multiple-date');
                     selectedMultipleDates = selectedMultipleDates.filter(d => d !== dateString);
                 } else {
-                    // Add to selection if we haven't reached max
                     if (selectedMultipleDates.length < maxMultipleDates) {
                         dayElement.classList.add('multiple-date');
                         selectedMultipleDates.push(dateString);
                     }
                 }
 
-                // Update the date inputs
                 updateDateTimeInputs(selectedMultipleDates);
+            }
+
+            // Update equipment inputs if "Yes" is selected
+            if (document.querySelector('input[name="need_equipment"]:checked').value === 'yes') {
+                updateEquipmentInputs();
             }
         }
 
@@ -663,8 +592,8 @@
         function updateDateTimeInputs(dates) {
             multipleDatesContainer.innerHTML = '';
 
-            if ((reservationType === 'single' && !dates.length) ||
-                (reservationType === 'consecutive' && !dates.length) ||
+            if ((reservationType === 'single' && !dates) ||
+                (reservationType === 'consecutive' && (!dates || dates.length === 0)) ||
                 (reservationType === 'multiple' && dates.length < minMultipleDates)) {
                 dateTimeContainer.classList.add('hidden');
                 return;
@@ -672,7 +601,6 @@
 
             dateTimeContainer.classList.remove('hidden');
 
-            // Convert single date to array for consistent handling
             if (typeof dates === 'string') {
                 dates = [dates];
             }
@@ -685,40 +613,43 @@
                 group.className = 'flex flex-row justify-between mb-4 date-time-group';
                 group.dataset.date = dateStr;
 
-                group.innerHTML = `
-                    <button class="remove-date" ${reservationType === 'multiple' ? '' : 'style="display: none;"'}>X</button>
-                    <div class="mb-6 mt-6">
-                        <label class="block text-gray-700 font-medium mb-2">${index === 0 ? 'Start' : 'Next'} Date:</label>
-                        <input type="text" readonly class="start-date w-[180px] px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-100" value="${formattedDate}">
-                    </div>
-                    <div class="mb-6 mt-6">
-                        <label class="block text-gray-700 font-medium mb-2">Time From:</label>
-                        <select class="time-from w-[160px] px-3 py-2 border-2 border-gray-600 rounded-lg">
-                            ${generateTimeOptions()}
-                        </select>
-                    </div>
-                    <div class="mb-6 mt-6">
-                        <label class="block text-gray-700 font-medium mb-2">Time To:</label>
-                        <select class="time-to w-[160px] px-3 py-2 border-2 border-gray-600 rounded-lg">
-                            ${generateTimeOptions()}
-                        </select>
-                    </div>
-                `;
+                let label = '';
+                if (reservationType === 'consecutive') {
+                    label = index === 0 ? 'Start Date' :
+                        (index === dates.length - 1 ? 'End Date' : `Day ${index + 1}`);
+                } else {
+                    label = index === 0 ? 'Start Date' : 'Next Date';
+                }
 
-                // Add remove handler for multiple dates
+                group.innerHTML = `
+            <button class="remove-date" ${reservationType === 'multiple' ? '' : 'style="display: none;"'}>X</button>
+            <div class="mb-6 mt-6">
+                <label class="block text-gray-700 font-medium mb-2">${label}</label>
+                <input type="text" readonly class="start-date w-[180px] px-3 py-2 border-2 border-gray-600 rounded-lg bg-gray-100" value="${formattedDate}">
+            </div>
+            <div class="mb-6 mt-6">
+                <label class="block text-gray-700 font-medium mb-2">Time From:</label>
+                <select class="time-from w-[160px] px-3 py-2 border-2 border-gray-600 rounded-lg">
+                    ${generateTimeOptions()}
+                </select>
+            </div>
+            <div class="mb-6 mt-6">
+                <label class="block text-gray-700 font-medium mb-2">Time To:</label>
+                <select class="time-to w-[160px] px-3 py-2 border-2 border-gray-600 rounded-lg">
+                    ${generateTimeOptions()}
+                </select>
+            </div>
+        `;
+
                 if (reservationType === 'multiple') {
                     const removeBtn = group.querySelector('.remove-date');
                     removeBtn.addEventListener('click', function() {
                         const dateToRemove = group.dataset.date;
                         selectedMultipleDates = selectedMultipleDates.filter(d => d !== dateToRemove);
-
-                        // Update calendar
                         const dayElement = document.querySelector(`.calendar-day[data-date="${dateToRemove}"]`);
                         if (dayElement) {
                             dayElement.classList.remove('multiple-date');
                         }
-
-                        // Update inputs
                         updateDateTimeInputs(selectedMultipleDates);
                     });
                 }
@@ -765,11 +696,17 @@
         ];
 
         // Handle equipment radio button changes
+        // Handle equipment radio button changes
         equipmentRadios.forEach(radio => {
             radio.addEventListener('change', function() {
                 if (this.value === 'yes') {
                     equipmentContainer.style.display = 'block';
-                    updateEquipmentInputs();
+                    // Only update if we have selected dates
+                    if ((reservationType === 'single' && selectedDate) ||
+                        (reservationType === 'consecutive' && selectedDate && daysCount) ||
+                        (reservationType === 'multiple' && selectedMultipleDates.length > 0)) {
+                        updateEquipmentInputs();
+                    }
                 } else {
                     equipmentContainer.style.display = 'none';
                 }
@@ -787,12 +724,15 @@
                 dates = [selectedDate];
             }
             else if (reservationType === 'consecutive' && daysCount && selectedDate) {
-                const allConsecutive = availableDates[selectedFacility]?.consecutive || [];
-                const selectedRange = allConsecutive.find(range =>
-                    range.length === daysCount && range[0] === selectedDate
-                );
-                if (selectedRange) {
-                    dates = selectedRange;
+                // For consecutive, we need to generate all dates in the range
+                const startDate = new Date(selectedDate);
+                dates = [selectedDate]; // Start with the selected date
+
+                // Add subsequent dates based on daysCount
+                for (let i = 1; i < daysCount; i++) {
+                    const nextDate = new Date(startDate);
+                    nextDate.setDate(startDate.getDate() + i);
+                    dates.push(formatDate(nextDate));
                 }
             }
             else if (reservationType === 'multiple' && selectedMultipleDates.length > 0) {
@@ -806,7 +746,7 @@
             }
 
             // Create equipment inputs for each date
-            dates.forEach(dateStr => {
+            dates.forEach((dateStr, index) => {
                 const date = new Date(dateStr);
                 const formattedDate = formatDateForDisplay(date);
 
@@ -814,28 +754,40 @@
                 dateGroup.className = 'equipment-date-group';
                 dateGroup.dataset.date = dateStr;
 
+                // Create appropriate label for consecutive dates
+                let dateLabel = formattedDate;
+                if (reservationType === 'consecutive') {
+                    if (index === 0) {
+                        dateLabel = `Start Date: ${formattedDate}`;
+                    } else if (index === dates.length - 1) {
+                        dateLabel = `End Date: ${formattedDate}`;
+                    } else {
+                        dateLabel = `Day ${index + 1}: ${formattedDate}`;
+                    }
+                }
+
                 dateGroup.innerHTML = `
-                    <div class="font-medium">${formattedDate}</div>
-                    <div class="equipment-rows">
-                        <div class="equipment-row">
-                            <select class="equipment-select">
-                                <option value="">Select Equipment</option>
-                                ${equipmentOptions.map(opt =>
+            <div class="font-medium">${dateLabel}</div>
+            <div class="equipment-rows">
+                <div class="equipment-row">
+                    <select class="equipment-select">
+                        <option value="">Select Equipment</option>
+                        ${equipmentOptions.map(opt =>
                     `<option value="${opt.id}">${opt.name}</option>`
                 ).join('')}
-                            </select>
-                            <select class="units-select">
-                                <option value="1">1 unit</option>
-                                <option value="2">2 units</option>
-                                <option value="3">3 units</option>
-                                <option value="4">4 units</option>
-                                <option value="5">5 units</option>
-                            </select>
-                            <button class="remove-equipment" style="display: none;">X</button>
-                        </div>
-                    </div>
-                    <button class="add-equipment">Add Equipment</button>
-                `;
+                    </select>
+                    <select class="units-select">
+                        <option value="1">1 unit</option>
+                        <option value="2">2 units</option>
+                        <option value="3">3 units</option>
+                        <option value="4">4 units</option>
+                        <option value="5">5 units</option>
+                    </select>
+                    <button class="remove-equipment" style="display: none;">X</button>
+                </div>
+            </div>
+            <button class="add-equipment">Add Equipment</button>
+        `;
 
                 // Add event for adding more equipment
                 const addBtn = dateGroup.querySelector('.add-equipment');
@@ -866,7 +818,7 @@
                     <option value="4">4 units</option>
                     <option value="5">5 units</option>
                 </select>
-                <button class="remove-equipment">X</button>
+                <button class="remove-equipment flex justify-center items-center">&times;</button>
             `;
 
             // Add remove event

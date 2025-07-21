@@ -40,6 +40,28 @@ class CalendarActivity extends Model
             ->with(['facility', 'equipment', 'reservationDetail']);
     }
 
+    public static function checkAvailability($facilityId, $dates)
+    {
+        return ReservationRequest::where('facility_id', $facilityId)
+            ->where('status', 'accepted')
+            ->where(function($query) use ($dates) {
+                $query->whereHasMorph(
+                    'reservationDetail',
+                    [Single::class, Consecutive::class, Multiple::class],
+                    function($q, $type) use ($dates) {
+                        if ($type === Single::class) {
+                            $q->whereIn('start_date', $dates);
+                        } else {
+                            $q->whereIn('start_date', $dates)
+                                ->orWhereIn('intermediate_date', $dates)
+                                ->orWhereIn('end_date', $dates);
+                        }
+                    }
+                );
+            })
+            ->exists();
+    }
+
     public function reservations(): HasMany
     {
         return $this->hasMany(ReservationRequest::class, 'transaction_date', 'date')
