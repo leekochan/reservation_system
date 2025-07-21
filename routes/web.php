@@ -26,3 +26,12 @@ Route::get('/admin/facilities', [AdminFacilityController::class, 'adminFacilitie
 Route::get('/admin/equipments', [AdminEquipmentsController::class, 'adminEquipments']);
 Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
 Route::get('/admin/equipments/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments']);
+
+
+Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities'])->name('admin.facilities.manage');
+// Add a new facility
+Route::post('/admin/facilities', [AdminFacilityController::class, 'store'])->name('facilities.store');
+// Update an existing facility
+Route::put('/admin/facilities/{id}', [AdminFacilityController::class, 'update'])->name('facilities.update');
+// Delete an existing facility
+Route::delete('/admin/facilities/{id}', [AdminFacilityController::class, 'destroy'])->name('facilities.destroy');
