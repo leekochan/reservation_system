@@ -108,7 +108,7 @@
             <!-- Reservation Prompt -->
             <div class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
                 <p class="text-gray-700">Do you want to request reservation for use of facilities?</p>
-                <a href="#" class="bg-pink-800 text-white px-4 py-2 rounded shadow hover:bg-pink-700">Reserve Now!</a>
+                <a href="/reservation" class="bg-pink-800 text-white px-4 py-2 rounded shadow hover:bg-pink-700">Reserve Now!</a>
             </div>
         </div>
 
@@ -240,7 +240,7 @@
 
             <!-- Right Column - Reserve Button -->
             <div class="flex justify-end flex-1">
-                <a href="/registration" class="inline-block bg-white text-[#7B172E] px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors duration-300 whitespace-nowrap">
+                <a href="/reservation" class="inline-block bg-white text-[#7B172E] px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors duration-300 whitespace-nowrap">
                     RESERVE NOW →
                 </a>
             </div>

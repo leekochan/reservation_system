@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin; // Note: Capital 'A' in Admin is standard for PSR-4
 
 use App\Http\Controllers\Controller;
+use App\Models\Equipment;
 use App\Models\Facility;
 use App\Models\ReservationRequest;
 
@@ -26,6 +27,8 @@ class AdminDashboardController extends Controller // Should extend base Controll
 
         $facilities = Facility::latest()->take(6)->get();
 
-        return view('dashboard', compact('reservations', 'pendingRequests', 'facilities')); // Changed to admin.dashboard
+        $equipments = Equipment::class::all();
+
+        return view('dashboard', compact('reservations', 'pendingRequests', 'facilities', 'equipments')); // Changed to admin.dashboard
     }
 }

@@ -15,6 +15,11 @@ return new class extends Migration
             $table->bigIncrements('equipment_id');
             $table->string('equipment_name');
             $table->string('picture')->nullable();
+            $table->string('units');
+            $table->decimal('per_hour_rate', 10, 2)->nullable();
+            $table->decimal('package_rate1', 10, 2)->nullable();
+            $table->decimal('package_rate2', 10, 2)->nullable();
+            $table->string('condition')->nullable();
             $table->enum('status', ['not_available', 'available'])
                 ->default('available');
             $table->timestamps();

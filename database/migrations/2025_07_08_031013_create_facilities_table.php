@@ -15,6 +15,10 @@ return new class extends Migration
             $table->bigIncrements('facility_id');
             $table->string('facility_name');
             $table->string('picture');
+            $table->decimal('facility_per_hour_rate', 10, 2)->nullable();
+            $table->decimal('facility_package_rate1', 10, 2)->nullable();
+            $table->decimal('facility_package_rate2', 10, 2)->nullable();
+            $table->string('facility_condition')->nullable();
             $table->enum('status', ['not_available', 'available'])
                 ->default('available');
             $table->timestamps();
