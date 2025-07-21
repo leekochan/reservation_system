@@ -60,9 +60,11 @@
     <!-- Static Sample Schedule Section -->
     <div class="mt-6 space-y-4">
         <div class="grid grid-cols-[80px_1fr_1fr_1fr] border-t border-b border-black">
-            <div class="text-center font-bold py-6 flex items-center justify-center text-sm">TUE</div>
+            <div class ="flex items-center justify-center flex-col">
+                <div class="text-center font-bold text-sm">TUE</div>
+                <div class="text-[#7B172E] font-extrabold text-2xl">01</div>
+            </div>
             <div class="bg-gray-100 w-auto p-4 border-l border-black">
-                <div class="text-maroon-800 font-extrabold text-lg">01</div>
                 <div class="font-bold">Intellectual Property Rights Seminar</div>
                 <div class="text-sm">Gymnasium</div>
                 <div class="text-sm">7:00 AM - 12:00 PM</div>
@@ -82,9 +84,11 @@
         </div>
 
         <div class="grid grid-cols-[80px_1fr_1fr] border-b border-black">
-            <div class="text-center font-bold py-6 flex items-center justify-center text-sm">WED</div>
+            <div class ="flex items-center justify-center flex-col">
+                <div class="text-center font-bold text-sm">WED</div>
+                <div class="text-[#7B172E] font-extrabold text-2xl">02</div>
+            </div>
             <div class="bg-gray-100 p-4 border-l border-black">
-                <div class="text-maroon-800 font-extrabold text-lg">02</div>
                 <div class="font-bold">Faculty Meeting</div>
                 <div class="text-sm">AVR</div>
                 <div class="text-sm">8:00 AM - 10:00 AM</div>
@@ -97,9 +101,11 @@
         </div>
 
         <div class="grid grid-cols-[80px_1fr_1fr] border-b border-black">
-            <div class="text-center font-bold py-6 flex items-center justify-center text-sm">THU</div>
+            <div class ="flex items-center justify-center flex-col">
+                <div class="text-center font-bold text-sm">THU</div>
+                <div class="text-[#7B172E] font-extrabold text-2xl">03</div>
+            </div>
             <div class="bg-gray-100 p-4 border-l border-black">
-                <div class="text-maroon-800 font-extrabold text-lg">03</div>
                 <div class="font-bold">Student Body Organization Meeting</div>
                 <div class="text-sm">Gymnasium</div>
                 <div class="text-sm">9:00 AM - 10:00 AM</div>

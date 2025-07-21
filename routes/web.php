@@ -24,4 +24,5 @@ Route::get('/calendar_of_activities', [CalendarController::class, 'calendar']);
 Route::get('/admin', [AdminDashboardController::class, 'adminDashboard']);
 Route::get('/admin/facilities', [AdminFacilityController::class, 'adminFacilities']);
 Route::get('/admin/equipments', [AdminEquipmentsController::class, 'adminEquipments']);
-
+Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
+Route::get('/admin/equipments/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments']);

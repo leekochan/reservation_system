@@ -11,4 +11,10 @@ class AdminEquipmentsController
         $equipments = Equipment::class::all();
         return view('equipments',  compact('equipments'));
     }
+    public function adminManageEquipments()
+    {
+        $equipments = Equipment::class::all();
+        return view('manage-equipments',  compact('equipments'));
+    }
+
 }

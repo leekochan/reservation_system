@@ -129,6 +129,56 @@
         #calendar-message {
             transition: color 0.3s ease;
         }
+        .equipment-container {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .equipment-date-group {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .equipment-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+        .equipment-row select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .add-equipment {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .add-equipment:hover {
+            background-color: #45a049;
+        }
+
+        .remove-equipment {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -185,18 +235,21 @@
         </div>
 
         <div class="mb-4 flex flex-row gap-8">
-            <div>
-                <label class="block text-gray-700 font-medium mb-2">Facilities</label>
-                <select id="facility-select" class="w-[270px] px-3 py-2 border-2 border-gray-600 rounded-lg">
-                    <option value="">Select a facility</option>
-                    <option value="auditorium">Auditorium</option>
-                    <option value="classroom">Classroom</option>
-                    <option value="sports-complex">Sports Complex</option>
-                </select>
-                <div id="calendar-message" class="text-sm mt-2">
-                    Please select a facility to see availability
+            <div class="mb-4 flex flex-row gap-8">
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">Facilities</label>
+                    <select id="facility-select" class="w-[270px] px-3 py-2 border-2 border-gray-600 rounded-lg">
+                        <option value="">Select a facility</option>
+                        @foreach($facilities as $facility)
+                            <option value="{{ $facility->facility_id }}" data-name="{{ $facility->facility_name }}">
+                                {{ $facility->facility_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div id="calendar-message" class="text-sm mt-2">
+                        Please select a facility to see availability
+                    </div>
                 </div>
-            </div>
 
             <div id="calendar-container" class="w-full">
                 <label class="block text-gray-700 font-medium mb-2">Available Dates</label>
@@ -234,19 +287,23 @@
             <input type="text" placeholder="Enter your answer here." class="border-2 w-full p-4">
         </div>
 
-        <div class="mb-4 mt-8 p-4 border-2 border-gray-700 rounded-md">
-            <label class="block text-gray-700 font-medium mb-2">Do you need other equipment? (Please see the approved rental rates and inclusive equipment use package for each venue. Subject to rental computation.)</label>
-            <div class="flex flex-row gap-6">
-                <label class="inline-flex items-center">
-                    <input type="radio" name="yes" value="yes" class="form-radio h-5 w-5 text-blue-600">
-                    <span class="ml-2 text-gray-700">Yes</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="radio" name="no" value="no" class="form-radio h-5 w-5 text-blue-600">
-                    <span class="ml-2 text-gray-700">No</span>
-                </label>
+            <div class="mb-4 mt-8 p-4 border-2 border-gray-700 rounded-md">
+                <label class="block text-gray-700 font-medium mb-2">Do you need other equipment?</label>
+                <div class="flex flex-row gap-6">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="need_equipment" value="yes" class="form-radio h-5 w-5 text-blue-600">
+                        <span class="ml-2 text-gray-700">Yes</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="need_equipment" value="no" class="form-radio h-5 w-5 text-blue-600" checked>
+                        <span class="ml-2 text-gray-700">No</span>
+                    </label>
+                </div>
+
+                <div id="equipment-container" class="equipment-container">
+                    <!-- Equipment rows will be added here dynamically -->
+                </div>
             </div>
-        </div>
     </div>
 
 
@@ -261,6 +318,7 @@
         let reservationType = null;
         let daysCount = null;
         let selectedMultipleDates = [];
+
 
         // DOM elements
         const facilitySelect = document.getElementById('facility-select');
@@ -280,6 +338,24 @@
         const transactionDateInput = document.getElementById('transaction-date');
         const today = new Date();
         transactionDateInput.value = formatDateForDisplay(today);
+        const equipmentRadios = document.querySelectorAll('input[name="need_equipment"]');
+        const equipmentContainer = document.getElementById('equipment-container');
+        const equipmentOptions = @json($equipments->map(function($item) {
+            return ['id' => $item->equipment_id, 'name' => $item->equipment_name];
+        }));
+
+        async function fetchAvailableDates(facilityId, reservationType, daysCount = null) {
+            try {
+                const response = await fetch(`/api/availability/${facilityId}?type=${reservationType}&days=${daysCount}`);
+                if (!response.ok) throw new Error('Failed to fetch availability');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching availability:', error);
+                return { single: [], consecutive: [] };
+            }
+        }
+
+        renderCalendar();
 
         // Sample available dates (in real app, this would come from backend)
         const availableDates = {
@@ -678,6 +754,135 @@
             }
             return options;
         }
+
+        // Sample equipment data (in real app, this would come from backend)
+        const equipmentOptions = [
+            { id: 1, name: "Projector" },
+            { id: 2, name: "Sound System" },
+            { id: 3, name: "Microphone" },
+            { id: 4, name: "Chairs" },
+            { id: 5, name: "Tables" }
+        ];
+
+        // Handle equipment radio button changes
+        equipmentRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'yes') {
+                    equipmentContainer.style.display = 'block';
+                    updateEquipmentInputs();
+                } else {
+                    equipmentContainer.style.display = 'none';
+                }
+            });
+        });
+
+        // Function to update equipment inputs based on selected dates
+        function updateEquipmentInputs() {
+            equipmentContainer.innerHTML = '';
+
+            // Get the selected dates based on reservation type
+            let dates = [];
+
+            if (reservationType === 'single' && selectedDate) {
+                dates = [selectedDate];
+            }
+            else if (reservationType === 'consecutive' && daysCount && selectedDate) {
+                const allConsecutive = availableDates[selectedFacility]?.consecutive || [];
+                const selectedRange = allConsecutive.find(range =>
+                    range.length === daysCount && range[0] === selectedDate
+                );
+                if (selectedRange) {
+                    dates = selectedRange;
+                }
+            }
+            else if (reservationType === 'multiple' && selectedMultipleDates.length > 0) {
+                dates = selectedMultipleDates;
+            }
+
+            // If no dates selected, show message
+            if (dates.length === 0) {
+                equipmentContainer.innerHTML = '<p>Please select dates first</p>';
+                return;
+            }
+
+            // Create equipment inputs for each date
+            dates.forEach(dateStr => {
+                const date = new Date(dateStr);
+                const formattedDate = formatDateForDisplay(date);
+
+                const dateGroup = document.createElement('div');
+                dateGroup.className = 'equipment-date-group';
+                dateGroup.dataset.date = dateStr;
+
+                dateGroup.innerHTML = `
+                    <div class="font-medium">${formattedDate}</div>
+                    <div class="equipment-rows">
+                        <div class="equipment-row">
+                            <select class="equipment-select">
+                                <option value="">Select Equipment</option>
+                                ${equipmentOptions.map(opt =>
+                    `<option value="${opt.id}">${opt.name}</option>`
+                ).join('')}
+                            </select>
+                            <select class="units-select">
+                                <option value="1">1 unit</option>
+                                <option value="2">2 units</option>
+                                <option value="3">3 units</option>
+                                <option value="4">4 units</option>
+                                <option value="5">5 units</option>
+                            </select>
+                            <button class="remove-equipment" style="display: none;">X</button>
+                        </div>
+                    </div>
+                    <button class="add-equipment">Add Equipment</button>
+                `;
+
+                // Add event for adding more equipment
+                const addBtn = dateGroup.querySelector('.add-equipment');
+                addBtn.addEventListener('click', function() {
+                    addEquipmentRow(dateGroup);
+                });
+
+                equipmentContainer.appendChild(dateGroup);
+            });
+        }
+
+        function addEquipmentRow(dateGroup) {
+            const equipmentRows = dateGroup.querySelector('.equipment-rows');
+            const newRow = document.createElement('div');
+            newRow.className = 'equipment-row';
+
+            newRow.innerHTML = `
+                <select class="equipment-select">
+                    <option value="">Select Equipment</option>
+                    ${equipmentOptions.map(opt =>
+                `<option value="${opt.id}">${opt.name}</option>`
+            ).join('')}
+                </select>
+                <select class="units-select">
+                    <option value="1">1 unit</option>
+                    <option value="2">2 units</option>
+                    <option value="3">3 units</option>
+                    <option value="4">4 units</option>
+                    <option value="5">5 units</option>
+                </select>
+                <button class="remove-equipment">X</button>
+            `;
+
+            // Add remove event
+            const removeBtn = newRow.querySelector('.remove-equipment');
+            removeBtn.addEventListener('click', function() {
+                equipmentRows.removeChild(newRow);
+            });
+
+            equipmentRows.appendChild(newRow);
+        }
+
+        // Update equipment inputs whenever dates change
+        // Add these lines to your existing handleDateSelection function:
+        // if (document.querySelector('input[name="need_equipment"]:checked').value === 'yes') {
+        //     updateEquipmentInputs();
+        // }
     });
 </script>
 

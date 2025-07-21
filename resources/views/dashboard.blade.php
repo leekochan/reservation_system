@@ -154,5 +154,45 @@
     </div>
 </section>
 
+@section('content')
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">Extra Equipments</h1>
+                <p class="text-gray-600">Manage your equipment inventory</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="grid grid-cols-2 bg-gray-100 px-6 py-3 border-b border-gray-200">
+                    <div class="font-semibold text-gray-700">Equipments</div>
+                    <div class="font-semibold text-gray-700">Available Units</div>
+                </div>
+
+                <div class="divide-y divide-gray-200">
+                    @foreach($equipments as $equipment)
+                        <div class="grid grid-cols-2 px-6 py-4 hover:bg-gray-50">
+                            <div class="font-medium text-gray-800">{{ $equipment->name }}</div>
+                            <div class="text-gray-600">
+                                @if($equipment->units === null)
+                                    Unlimited Units
+                                @elseif($equipment->units == 0)
+                                    No units available
+                                @else
+                                    {{ $equipment->units }} units
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 text-right">
+                    <a class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Manage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
 </body>
 </html>

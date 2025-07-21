@@ -12,4 +12,10 @@ class AdminFacilityController
         $facilities = Facility::all();
         return view('facilities', compact('facilities'));
     }
+
+    public function adminManageFacilities()
+    {
+        $facilities = Facility::all();
+        return view('manage-facilities', compact('facilities'));
+    }
 }
