@@ -8,30 +8,53 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EquipmentsController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\ReservationController;
-use App\Models\CalendarActivity;
-use App\Models\Consecutive;
-use App\Models\Multiple;
-use App\Models\ReservationRequest;
-use App\Models\Single;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Route;
 
+// Redirect to user dashboard
 Route::get('/', function () {
     return redirect('/user');
 });
 
-Route::get('/user', [DashboardController::class, 'userDashboard']);
-Route::get('/facilities', [FacilityController::class, 'userFacilities']);
-Route::get('/equipments', [EquipmentsController::class, 'userEquipments']);
-Route::get('/reservation', [ReservationController::class, 'userReservation']);
+// User routes
+Route::prefix('user')->group(function () {
+    Route::get('/', [DashboardController::class, 'userDashboard']);
+    Route::get('/facilities', [FacilityController::class, 'userFacilities']);
+    Route::get('/equipments', [EquipmentsController::class, 'userEquipments']);
+    Route::get('/reservation', [ReservationController::class, 'userReservation']);
+});
 
+// Calendar route
 Route::get('/calendar_of_activities', [CalendarController::class, 'calendar']);
 
-Route::get('/admin', [AdminDashboardController::class, 'adminDashboard']);
-Route::get('/admin/facilities', [AdminFacilityController::class, 'adminFacilities']);
-Route::get('/admin/equipments', [AdminEquipmentsController::class, 'adminEquipments']);
-Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
-Route::get('/admin/equipments/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments']);
+// Admin routes
+Route::prefix('admin')->group(function () {
+    // Dashboard
+    Route::get('/', [AdminDashboardController::class, 'adminDashboard']);
+
+    // Facilities routes
+    Route::prefix('facilities')->group(function () {
+        Route::get('/', [AdminFacilityController::class, 'adminFacilities']);
+        Route::get('/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities'])
+            ->name('admin.facilities.manage');
+
+        // CRUD operations
+        Route::post('/', [AdminFacilityController::class, 'store'])->name('facilities.store');
+        Route::put('/{id}', [AdminFacilityController::class, 'update'])->name('facilities.update');
+        Route::delete('/{id}', [AdminFacilityController::class, 'destroy'])->name('facilities.destroy');
+    });
+
+    // Equipment routes
+    Route::prefix('equipments')->group(function () {
+        Route::get('/', [AdminEquipmentsController::class, 'adminEquipments']);
+        Route::get('/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments'])
+            ->name('admin.equipments.manage');
+
+        // CRUD operations
+        Route::post('/', [AdminEquipmentsController::class, 'store'])->name('equipments.store');
+        Route::put('/{id}', [AdminEquipmentsController::class, 'update'])->name('equipments.update');
+        Route::delete('/{id}', [AdminEquipmentsController::class, 'destroy'])->name('equipments.destroy');
+    });
+});
 
 Route::get('/api/availability/{facilityId}', function($facilityId) {
     $type = request()->query('type', 'single');
