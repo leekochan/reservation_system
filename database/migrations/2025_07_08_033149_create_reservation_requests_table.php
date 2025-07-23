@@ -36,6 +36,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
+            $table->text('signature')->nullable();
             $table->enum('status', ['pending', 'accepted', 'declined', 'completed', 'cancelled'])->default('pending');
             $table->string('total_payment');
             $table->timestamp('created_at');

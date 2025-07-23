@@ -24,6 +24,7 @@ Route::get('/user', [DashboardController::class, 'userDashboard']);
 Route::get('/facilities', [FacilityController::class, 'userFacilities']);
 Route::get('/equipments', [EquipmentsController::class, 'userEquipments']);
 Route::get('/reservation', [ReservationController::class, 'userReservation']);
+Route::post('/reservation', [ReservationController::class, 'storeReservation'])->name('reservation.store');
 
 Route::get('/calendar_of_activities', [CalendarController::class, 'calendar']);
 
@@ -32,6 +33,7 @@ Route::get('/admin/facilities', [AdminFacilityController::class, 'adminFacilitie
 Route::get('/admin/equipments', [AdminEquipmentsController::class, 'adminEquipments']);
 Route::get('/admin/facilities/manage-facilities', [AdminFacilityController::class, 'adminManageFacilities']);
 Route::get('/admin/equipments/manage-equipments', [AdminEquipmentsController::class, 'adminManageEquipments']);
+
 
 Route::get('/api/availability/{facilityId}', function($facilityId) {
     $type = request()->query('type', 'single');
