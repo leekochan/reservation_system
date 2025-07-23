@@ -8,7 +8,7 @@
 @include('partials.admin-navbar')
 
 <div class="p-10 mt-16">
-    <h1 class="font-bold text-3xl mb-2 ml-4">Reservation</h1>
+    <h1 class="font-bold text-3xl mb-2 ml-4">RESERVATION</h1>
     @if($reservations->isEmpty())
         <p class="text-xl text-gray-500 ml-4 mt-4">No accepted reservations found.</p>
     @else
@@ -70,7 +70,7 @@
 
 
 <div class="p-10">
-    <h1 class="font-bold text-2xl mb-2 ml-4">Reservation</h1>
+    <h1 class="font-bold text-3xl mb-2 ml-4">PENDING</h1>
     @if($pendingRequests->isEmpty())
         <p class="text-xl text-gray-500 ml-4 mt-4">No pending reservations found.</p>
     @else
@@ -100,10 +100,10 @@
                         </div>
                         @if($request->reservationDetail)
                             <div class="mt-2">
-                                    @if($request->reservation_type === 'Single')
+                                @if($request->reservation_type === 'Single')
                                     <p class="text-base text-gray-600 flex-grow mt-2">
                                         Date: <span
-                                            class="font-semibold text-black">{{ $reservation->reservationDetails->start_date }}</span>
+                                            class="font-semibold text-black">{{ $request->reservationDetail->start_date }}</span>
                                     </p>
                                     <p class="text-gray-500 text-sm">Time from:</p>
                                     <p class="font-medium">
@@ -111,11 +111,11 @@
                                     </p>
                                     <p class="text-gray-500 text-sm">Time from:</p>
                                     <p class="font-medium">
-                                    {{ $request->reservationDetail->time_to }}
+                                        {{ $request->reservationDetail->time_to }}
                                     </p>
-                                    @elseif($request->reservation_type === 'Consecutive' || $request->reservation_type === 'Multiple')
-                                        Multiple dates (see details)
-                                    @endif
+                                @elseif($request->reservation_type === 'Consecutive' || $request->reservation_type === 'Multiple')
+                                    Multiple dates (see details)
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -144,56 +144,50 @@
 
         <!-- View All Button -->
         <div class="mt-8 flex justify-end">
-            <a href="/admin/facilities" class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded shadow transition">
-                View all
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
+            <div class="mt-6 text-right">
+                <button class="w-auto py-2 px-4 mr-4 bg-green-600 uppercase hover:bg-green-700 text-white rounded-md w-1/4">
+                    <a href="/admin/facilities">View all >></a>
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="extra-equipments" class="bg-white py-16 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4">
+        <h2 class="text-3xl font-bold mb-10">Extra Equipments</h2>
+
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="grid grid-cols-2 bg-gray-200 px-6 py-4 border-b border-gray-300">
+                <div class="font-bold text-gray-800">Equipments</div>
+                <div class="font-bold text-gray-800">Available Unit</div>
+            </div>
+
+            <div class="divide-y divide-gray-200">
+                @foreach($equipments as $equipment)
+                    <div class="grid grid-cols-2 px-6 py-3 hover:bg-gray-50">
+                        <div class="text-gray-800">{{ $equipment->equipment_name }}</div>
+                        <div class="text-gray-700">
+                            @if($equipment->units === null)
+                                Unlimited Units
+                            @elseif($equipment->units == 0)
+                                No units available
+                            @else
+                                {{ $equipment->units }} units
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+        </div>
+        <div class="px-6 py-4 bg-white text-right">
+            <a href="/admin/equipments" class="w-auto py-2 px-4 bg-green-600 uppercase hover:bg-green-700 text-white rounded-md">
+                Manage
             </a>
         </div>
     </div>
 </section>
 
-
-@section('content')
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-4xl mx-auto">
-            <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-800">Extra Equipments</h1>
-                <p class="text-gray-600">Manage your equipment inventory</p>
-            </div>
-
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="grid grid-cols-2 bg-gray-100 px-6 py-3 border-b border-gray-200">
-                    <div class="font-semibold text-gray-700">Equipments</div>
-                    <div class="font-semibold text-gray-700">Available Units</div>
-                </div>
-
-                <div class="divide-y divide-gray-200">
-                    @foreach($equipments as $equipment)
-                        <div class="grid grid-cols-2 px-6 py-4 hover:bg-gray-50">
-                            <div class="font-medium text-gray-800">{{ $equipment->name }}</div>
-                            <div class="text-gray-600">
-                                @if($equipment->units === null)
-                                    Unlimited Units
-                                @elseif($equipment->units == 0)
-                                    No units available
-                                @else
-                                    {{ $equipment->units }} units
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 text-right">
-                    <a class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        Manage
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-@endsection
 </body>
 </html>

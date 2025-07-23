@@ -14,11 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class ReservationRequest extends Model
 {
     protected $primaryKey = 'reservation_id';
-    
+
     protected $fillable = [
         'name',
         'email',
-        'organization', 
+        'organization',
         'contact_no',
         'purpose',
         'instruction',
@@ -35,6 +35,11 @@ class ReservationRequest extends Model
     public function facility(): BelongsTo
     {
         return $this->belongsTo(Facility::class, 'facility_id', 'facility_id');
+    }
+
+    public function equipment(): BelongsTo
+    {
+        return $this->belongsTo(Equipment::class, 'equipment_id', 'equipment_id');
     }
 
     public function equipments(): BelongsToMany

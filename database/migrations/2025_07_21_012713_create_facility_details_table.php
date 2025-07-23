@@ -13,8 +13,10 @@ return new class extends Migration
     {
         Schema::create('facility_details', function (Blueprint $table) {
             $table->id('facility_details_id')->primary();
-            $table->float('package');
-            $table->float('per_hour_rate');
+
+            $table->decimal('facility_per_hour_rate', 10, 2)->nullable();
+            $table->decimal('facility_package_rate1', 10, 2)->nullable();
+            $table->decimal('facility_package_rate2', 10, 2)->nullable();
 
             $table->unsignedBigInteger('facility_id');
             $table->foreign('facility_id')

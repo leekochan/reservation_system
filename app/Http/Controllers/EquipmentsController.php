@@ -8,7 +8,7 @@ class EquipmentsController extends Controller
 {
     public function equipment()
     {
-        $equipments = Equipment::where('status', 'available')->get(); // Fetch available equipments
-        return view('user-equipments', compact('equipments'));
+        $equipments = Equipment::class->get()->all(); // Fetch all equipments
+        return view('user-equipments');
     }
 }
