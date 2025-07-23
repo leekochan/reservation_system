@@ -8,8 +8,7 @@
 @include('partials.navbar')
 
 <div id="dashboard" class="flex items-center justify-center min-h-[calc(100vh)] bg-cover bg-center bg-no-repeat backdrop-blur-sm"
-    style="background-image: url('{{ asset('pictures/cebuUserBackground.jpg') }}'); background-blend-mode: overlay;"
->
+    >
 
     <div class="text-center">
         <div class="mb-6 flex justify-center">

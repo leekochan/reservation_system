@@ -3,12 +3,20 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\admin\AdminEquipmentsController;
 use App\Http\Controllers\admin\AdminFacilityController;
+use App\Http\Controllers\Admin\AdminFacilityBlockController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EquipmentsController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
+use Carbon\Carbon;
+use App\Models\ReservationRequest;
+use App\Models\Single;
+use App\Models\Consecutive;
+use App\Models\Multiple;
+use App\Models\CalendarActivity;
+use App\Models\Facility;
 
 // Redirect to user dashboard
 Route::get('/', function () {
@@ -25,11 +33,20 @@ Route::prefix('user')->group(function () {
 
 // Calendar route
 Route::get('/calendar_of_activities', [CalendarController::class, 'calendar']);
+Route::get('/calendar-activities', [App\Http\Controllers\CalendarController::class, 'index'])->name('calendar.activities');
 
 // Admin routes
 Route::prefix('admin')->group(function () {
     // Dashboard
     Route::get('/', [AdminDashboardController::class, 'adminDashboard']);
+    
+    // Calendar route for admin
+    Route::get('/calendar', function() {
+        return app(CalendarController::class)->index(request()->merge(['admin' => true]));
+    })->name('admin.calendar');
+    
+    // Reservation route for admin (reuse dashboard controller)
+    Route::get('/reservation', [AdminDashboardController::class, 'adminDashboard'])->name('admin.reservation');
 
     // Facilities routes
     Route::prefix('facilities')->group(function () {
@@ -54,6 +71,16 @@ Route::prefix('admin')->group(function () {
         Route::put('/{id}', [AdminEquipmentsController::class, 'update'])->name('equipments.update');
         Route::delete('/{id}', [AdminEquipmentsController::class, 'destroy'])->name('equipments.destroy');
     });
+
+    // Facility block routes
+    Route::prefix('facility-blocks')->group(function () {
+        Route::get('/manage', [AdminFacilityBlockController::class, 'manage'])->name('admin.facility-blocks.manage');
+        Route::get('/blocks', [AdminFacilityBlockController::class, 'getBlocks'])->name('admin.facility-blocks.get');
+        Route::delete('/{id}', [AdminFacilityBlockController::class, 'destroy'])->name('admin.facility-blocks.destroy');
+    });
+    
+    // Separate route for storing facility blocks (to match the AJAX call)
+    Route::post('/facility-blocks', [AdminFacilityBlockController::class, 'store'])->name('admin.facility-blocks.store');
 });
 
 Route::get('/api/availability/{facilityId}', function($facilityId) {
@@ -62,7 +89,6 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
     $year = request()->query('year', date('Y'));
     $days = request()->query('days', 2);
     $startDate = request()->query('start_date');
-
 
     if ($type === 'consecutive' && $startDate) {
         // Check if specific consecutive range is available
@@ -74,8 +100,8 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
             $dateStr = $currentDate->format('Y-m-d');
             $range[] = $dateStr;
 
-            // Check if date is available
-            $isAvailable = !ReservationRequest::where('facility_id', $facilityId)
+            // Check if date is available (reservations)
+            $hasReservation = ReservationRequest::where('facility_id', $facilityId)
                 ->where('status', 'accepted')
                 ->where(function($query) use ($dateStr) {
                     $query->whereHasMorph(
@@ -94,7 +120,13 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
                 })
                 ->exists();
 
-            if (!$isAvailable) {
+            // Check if date is blocked by admin
+            $hasAdminBlock = \App\Models\AdminFacilityBlock::active()
+                ->forFacility($facilityId)
+                ->forDate($dateStr)
+                ->exists();
+
+            if ($hasReservation || $hasAdminBlock) {
                 $allAvailable = false;
                 break;
             }
@@ -106,6 +138,7 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
             'consecutive' => $allAvailable ? [$range] : []
         ]);
     }
+    
     // Get all dates in the month
     $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
     $dates = [];
@@ -116,7 +149,16 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
     // Check availability for each date
     $unavailableDates = [];
     foreach ($dates as $date) {
-        if (CalendarActivity::checkAvailability($facilityId, [$date])) {
+        // Check regular reservations
+        $hasReservation = CalendarActivity::checkAvailability($facilityId, [$date]);
+        
+        // Check admin blocks
+        $hasAdminBlock = \App\Models\AdminFacilityBlock::active()
+            ->forFacility($facilityId)
+            ->forDate($date)
+            ->exists();
+        
+        if ($hasReservation || $hasAdminBlock) {
             $unavailableDates[] = $date;
         }
     }
@@ -128,7 +170,21 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
         // This is a simplified example - you might want to implement a more efficient way
         for ($i = 0; $i <= count($dates) - $days; $i++) {
             $range = array_slice($dates, $i, $days);
-            $isAvailable = !CalendarActivity::checkAvailability($facilityId, $range);
+            $isAvailable = true;
+            
+            foreach ($range as $rangeDate) {
+                $hasReservation = CalendarActivity::checkAvailability($facilityId, [$rangeDate]);
+                $hasAdminBlock = \App\Models\AdminFacilityBlock::active()
+                    ->forFacility($facilityId)
+                    ->forDate($rangeDate)
+                    ->exists();
+                    
+                if ($hasReservation || $hasAdminBlock) {
+                    $isAvailable = false;
+                    break;
+                }
+            }
+            
             if ($isAvailable) {
                 $consecutiveRanges[] = $range;
             }
@@ -140,5 +196,14 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
         'consecutive' => $consecutiveRanges,
         'month' => $month,
         'year' => $year
+    ]);
+});
+
+// API route for fetching facilities
+Route::get('/api/facilities', function() {
+    $facilities = Facility::where('status', 'available')->get(['facility_id', 'facility_name']);
+    return response()->json([
+        'success' => true,
+        'facilities' => $facilities
     ]);
 });
