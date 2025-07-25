@@ -17,10 +17,10 @@
             </div>
             <div class="sm:ml-6 sm:flex sm:space-x-8">
                 <a href="/admin" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="dashboard">Dashboard</a>
+                <a href="/admin/reservations" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="reservations">Reservations</a>
                 <a href="/admin/facilities" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="facilities">Facilities</a>
                 <a href="/admin/equipments" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="equipments">Equipment</a>
-                <a href="/calendar_of_activities" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="calendar">Calendar</a>
-                <a href="/admin/reservation" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="reservation">Reservation</a>
+                <a href="/admin/calendar" class="nav-link border-transparent text-gray-300 hover:border-white hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" data-section="calendar">Calendar</a>
             </div>
         </div>
     </div>
@@ -28,57 +28,28 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const sections = document.querySelectorAll('section, div[id]');
         const navLinks = document.querySelectorAll('.nav-link');
-        const headerHeight = document.querySelector('nav').offsetHeight;
+        const currentPath = window.location.pathname;
 
-        // Smooth scroll for nav links only when target is an in-page section
+        // Highlight active nav item based on current path
         navLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                const targetId = this.getAttribute('href');
-
-                // Only prevent default and handle smooth scroll if it's a hash link
-                if (targetId.startsWith('#')) {
-                    e.preventDefault();
-                    const targetSection = document.querySelector(targetId);
-                    if (targetSection) {
-                        window.scrollTo({
-                            top: targetSection.offsetTop - headerHeight,
-                            behavior: 'smooth'
-                        });
-                    }
+            const href = link.getAttribute('href');
+            if (href) {
+                // Exact match for dashboard
+                if (currentPath === '/admin' && href === '/admin') {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
                 }
-                // Otherwise, let the default anchor behavior happen (normal navigation)
-            });
-        });
-
-        // Rest of your Intersection Observer code remains the same...
-        const observerOptions = {
-            root: null,
-            rootMargin: `-${headerHeight}px 0px -50% 0px`,
-            threshold: 0.1
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const sectionId = entry.target.id;
-                    navLinks.forEach(link => {
-                        if (link.dataset.section === sectionId) {
-                            link.classList.add('border-white', 'text-white');
-                            link.classList.remove('border-transparent', 'text-gray-300');
-                        } else {
-                            link.classList.remove('border-white', 'text-white');
-                            link.classList.add('border-transparent', 'text-gray-300');
-                        }
-                    });
+                // For other routes, check if current path starts with the href
+                else if (href !== '/admin' && currentPath.startsWith(href)) {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
                 }
-            });
-        }, observerOptions);
-
-        sections.forEach(section => {
-            if (section.id) {
-                observer.observe(section);
+                // Default inactive state
+                else {
+                    link.classList.remove('border-white', 'text-white');
+                    link.classList.add('border-transparent', 'text-gray-300');
+                }
             }
         });
     });

@@ -6,68 +6,48 @@ use App\Http\Controllers\Controller;
 use App\Models\Equipment;
 use App\Models\Facility;
 use App\Models\ReservationRequest;
+use Illuminate\Http\Request;
 
-class AdminDashboardController extends Controller
+class AdminReservationController extends Controller
 {
     /**
-     * Display the admin dashboard
+     * Display the reservation management page
      */
-    public function adminDashboard()
+    public function index()
     {
-        // Get recent accepted reservations for dashboard
-        $reservations = ReservationRequest::with([
+        // Get counts for each status
+        $pendingCount = ReservationRequest::where('status', 'pending')->count();
+        $acceptedCount = ReservationRequest::where('status', 'accepted')->count();
+        $declinedCount = ReservationRequest::where('status', 'declined')->count();
+        $completedCount = ReservationRequest::where('status', 'completed')->count();
+
+        // Get all reservations (we'll filter on frontend)
+        $allReservations = ReservationRequest::with([
             'facility',
             'equipment',
             'equipments',
             'reservationDetail'
-        ])
-            ->where('status', 'accepted')
-            ->orderBy('transaction_date', 'desc')
-            ->latest()
-            ->take(6)
-            ->get();
+        ])->orderBy('created_at', 'desc')->get();
 
-        // Get recent pending requests for dashboard
-        $pendingRequests = ReservationRequest::with([
-            'facility', 
-            'equipment', 
-            'equipments',
-            'reservationDetail'
-        ])
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
-            ->latest()
-            ->take(6)
-            ->get();
-
-        // Get recent facilities
-        $facilities = Facility::latest()->take(6)->get();
-
-        // Get all equipment
-        $equipments = Equipment::all();
-
-        // Get dashboard statistics
-        $stats = [
-            'total_reservations' => ReservationRequest::count(),
-            'pending_requests' => ReservationRequest::where('status', 'pending')->count(),
-            'accepted_reservations' => ReservationRequest::where('status', 'accepted')->count(),
-            'total_facilities' => Facility::count(),
-            'total_equipment' => Equipment::count(),
-        ];
-
-        return view('dashboard', compact('reservations', 'pendingRequests', 'facilities', 'equipments', 'stats'));
+        return view('reservation', compact(
+            'allReservations',
+            'pendingCount',
+            'acceptedCount', 
+            'declinedCount',
+            'completedCount'
+        ));
     }
 
     /**
-     * Get reservation details for dashboard modal (simplified version)
+     * Get reservation details via AJAX
      */
-    public function getReservationDetails($id)
+    public function show($id)
     {
         try {
             $reservation = ReservationRequest::with([
                 'facility',
-                'equipment',
-                'equipments', 
+                'equipment', 
+                'equipments',
                 'reservationDetail'
             ])->findOrFail($id);
 
@@ -119,9 +99,9 @@ class AdminDashboardController extends Controller
     }
 
     /**
-     * Quick accept reservation from dashboard
+     * Accept a reservation
      */
-    public function acceptReservation($id)
+    public function accept($id)
     {
         try {
             $reservation = ReservationRequest::findOrFail($id);
@@ -142,9 +122,9 @@ class AdminDashboardController extends Controller
     }
 
     /**
-     * Quick decline reservation from dashboard
+     * Decline a reservation
      */
-    public function declineReservation($id)
+    public function decline($id)
     {
         try {
             $reservation = ReservationRequest::findOrFail($id);
@@ -160,6 +140,111 @@ class AdminDashboardController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error declining reservation: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark a reservation as completed
+     */
+    public function complete($id)
+    {
+        try {
+            $reservation = ReservationRequest::findOrFail($id);
+            $reservation->status = 'completed';
+            $reservation->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation marked as completed',
+                'status' => 'completed'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error completing reservation: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get reservations by status
+     */
+    public function getByStatus($status)
+    {
+        try {
+            $validStatuses = ['pending', 'accepted', 'declined', 'completed'];
+            
+            if (!in_array($status, $validStatuses)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid status'
+                ], 400);
+            }
+
+            $reservations = ReservationRequest::with([
+                'facility',
+                'equipment',
+                'equipments',
+                'reservationDetail'
+            ])
+            ->where('status', $status)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+            return response()->json([
+                'success' => true,
+                'reservations' => $reservations,
+                'count' => $reservations->count()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching reservations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Cancel a reservation
+     */
+    public function cancel($id)
+    {
+        try {
+            $reservation = ReservationRequest::findOrFail($id);
+            $reservation->status = 'cancelled';
+            $reservation->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation cancelled successfully',
+                'status' => 'cancelled'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error cancelling reservation: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a reservation (permanent deletion)
+     */
+    public function destroy($id)
+    {
+        try {
+            $reservation = ReservationRequest::findOrFail($id);
+            $reservation->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting reservation: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -266,94 +266,99 @@ let currentReservationId = null;
 
 function openModal(reservationId) {
     currentReservationId = reservationId;
-    // Show modal
-    document.getElementById('reservationModal').classList.remove('hidden');
     
-    // Fetch reservation details
-    fetch(`/admin/reservation/${reservationId}/details`)
+    // Fetch reservation details using the same endpoint as reservations page
+    fetch(`/admin/reservations/${reservationId}/details`)
         .then(response => response.json())
         .then(data => {
-            // Update button states based on current status
-            updateButtonStates(data.status);
+            if (data.error) {
+                alert('Error loading reservation details');
+                return;
+            }
             
-            // Populate modal content
-            document.getElementById('modalContent').innerHTML = `
-                <!-- Status and Transaction Info -->
-                <div class="mb-4 p-3 bg-gray-50 rounded-md">
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center space-x-3">
-                            <span class="px-3 py-1 text-sm font-semibold rounded-sm ${getStatusColor(data.status)}">${data.status.toUpperCase()}</span>
-                            <span class="text-sm text-gray-600">Transaction Date: ${data.transaction_date}</span>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm text-gray-500">${getTimeAgo(data.created_at)}</p>
-                        </div>
-                    </div>
-                    <!-- Price in separate row -->
-                    <div class="text-start pt-2 border-t border-gray-200">
-                        <p class="text-md font-bold text-green-600">Total Payment: ₱${parseFloat(data.total_payment).toLocaleString('en-PH', {minimumFractionDigits: 2})}</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Personal Information -->
-                    <div>
-                        <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Personal Information</h4>
-                        <div class="space-y-2">
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Name:</span> ${data.name}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Email:</span> ${data.email}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Organization:</span> ${data.organization}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Contact:</span> ${data.contact_no}</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Reservation Information -->
-                    <div>
-                        <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Reservation Information</h4>
-                        <div class="space-y-2">
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Type:</span> ${data.reservation_type}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Facility:</span> ${data.facility.facility_name}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Equipment:</span> ${data.equipment ? data.equipment.equipment_name : 'No equipment'}</p>
-                            <p class="text-md font-semibold"><span class="font-medium text-gray-700">Electric Equipment:</span> ${data.electric_equipment || 'None'}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Purpose -->
-                <div class="mb-6">
-                    <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Purpose</h4>
-                    <p class="text-md text-gray-600 bg-gray-50 p-3 rounded-md">${data.purpose}</p>
-                </div>
-                
-                ${data.instruction ? `
-                <div class="mb-6">
-                    <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Special Instructions</h4>
-                    <p class="text-md text-gray-600 bg-gray-50 p-3 rounded-md">${data.instruction}</p>
-                </div>
-                ` : ''}
-                
-                <!-- Schedule Details -->
-                <div class="mb-6">
-                    <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Complete Schedule Details</h4>
-                    <div class="bg-gray-50 p-4 rounded-md">
-                        ${getCompleteScheduleDetails(data)}
-                    </div>
-                </div>
-
-                ${data.signature ? `
-                <div class="mb-6">
-                    <h4 class="font-semibold text-gray-900 mb-3 border-b pb-2">Digital Signature</h4>
-                    <div class="bg-gray-50 p-3 rounded-md">
-                        <img src="${data.signature}" alt="Digital Signature" class="max-w-xs border rounded">
-                    </div>
-                </div>
-                ` : ''}
-            `;
+            showReservationModal(data);
         })
         .catch(error => {
             console.error('Error:', error);
-            document.getElementById('modalContent').innerHTML = '<p class="text-red-500">Error loading reservation details.</p>';
+            alert('Error loading reservation details');
         });
+}
+
+function showReservationModal(reservation) {
+    // Show modal
+    document.getElementById('reservationModal').classList.remove('hidden');
+    
+    // Update button states based on current status
+    updateButtonStates(reservation.status);
+    
+    // Create equipment list
+    let equipmentInfo = 'No equipment requested';
+    if (reservation.equipment && reservation.equipment.equipment_name) {
+        equipmentInfo = reservation.equipment.equipment_name;
+    }
+    
+    // Create schedule information
+    let scheduleInfo = '';
+    if (reservation.reservation_detail) {
+        const detail = reservation.reservation_detail;
+        if (reservation.reservation_type === 'Single') {
+            scheduleInfo = `
+                <p><strong>Date:</strong> ${detail.start_date || 'N/A'}</p>
+                <p><strong>Time:</strong> ${detail.time_from || 'N/A'} - ${detail.time_to || 'N/A'}</p>
+            `;
+        } else if (reservation.reservation_type === 'Consecutive') {
+            scheduleInfo = `
+                <p><strong>Start Date:</strong> ${detail.start_date || 'N/A'} (${detail.start_time_from || ''} - ${detail.start_time_to || ''})</p>
+                <p><strong>End Date:</strong> ${detail.end_date || 'N/A'} (${detail.end_time_from || ''} - ${detail.end_time_to || ''})</p>
+                ${detail.intermediate_date ? `<p><strong>Intermediate Date:</strong> ${detail.intermediate_date} (${detail.intermediate_time_from || ''} - ${detail.intermediate_time_to || ''})</p>` : ''}
+            `;
+        } else if (reservation.reservation_type === 'Multiple') {
+            scheduleInfo = `
+                <p><strong>Start Date:</strong> ${detail.start_date || 'N/A'} (${detail.start_time_from || ''} - ${detail.start_time_to || ''})</p>
+                <p><strong>End Date:</strong> ${detail.end_date || 'N/A'} (${detail.end_time_from || ''} - ${detail.end_time_to || ''})</p>
+                ${detail.intermediate_date ? `<p><strong>Intermediate Date:</strong> ${detail.intermediate_date} (${detail.intermediate_time_from || ''} - ${detail.intermediate_time_to || ''})</p>` : ''}
+            `;
+        }
+    }
+    
+    // Populate modal content
+    document.getElementById('modalContent').innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <h3 class="text-lg font-semibold mb-4 text-gray-900">Reservation Information</h3>
+                <div class="space-y-3">
+                    <p><strong>Reservation ID:</strong> ${reservation.reservation_id}</p>
+                    <p><strong>Name:</strong> ${reservation.name}</p>
+                    <p><strong>Email:</strong> ${reservation.email}</p>
+                    <p><strong>Organization:</strong> ${reservation.organization}</p>
+                    <p><strong>Contact:</strong> ${reservation.contact_no}</p>
+                    <p><strong>Purpose:</strong> ${reservation.purpose}</p>
+                    <p><strong>Type:</strong> ${reservation.reservation_type}</p>
+                    <p><strong>Status:</strong> <span class="px-3 py-1 text-sm font-semibold rounded-sm ${getStatusColor(reservation.status)}">${reservation.status.toUpperCase()}</span></p>
+                    <p><strong>Total Payment:</strong> ₱${parseFloat(reservation.total_payment).toLocaleString('en-PH', {minimumFractionDigits: 2})}</p>
+                    <p><strong>Submitted:</strong> ${new Date(reservation.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="text-lg font-semibold mb-4 text-gray-900">Facility & Schedule</h3>
+                <div class="space-y-3">
+                    <p><strong>Facility:</strong> ${reservation.facility.facility_name}</p>
+                    <p><strong>Equipment:</strong> ${equipmentInfo}</p>
+                    <p><strong>Personal Equipment:</strong> ${reservation.electric_equipment || 'None'}</p>
+                    <div><strong>Schedule:</strong></div>
+                    <div class="ml-4">
+                        ${scheduleInfo}
+                    </div>
+                </div>
+                
+                ${reservation.instruction ? `
+                    <h3 class="text-lg font-semibold mb-2 mt-6 text-gray-900">Additional Instructions</h3>
+                    <p class="text-gray-700">${reservation.instruction}</p>
+                ` : ''}
+            </div>
+        </div>
+    `;
 }
 
 function getStatusColor(status) {
@@ -364,86 +369,6 @@ function getStatusColor(status) {
         case 'completed': return 'bg-blue-100 text-blue-800';
         case 'cancelled': return 'bg-gray-100 text-gray-800';
         default: return 'bg-gray-100 text-gray-800';
-    }
-}
-
-function getTimeAgo(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-    const diffMinutes = Math.floor(diffTime / (1000 * 60));
-
-    if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
-    return 'Just now';
-}
-
-function getCompleteScheduleDetails(data) {
-    if (!data.reservation_detail) return '<p class="text-sm text-gray-600">No schedule details available.</p>';
-    
-    const detail = data.reservation_detail;
-    
-    if (data.reservation_type === 'Single') {
-        return `
-            <div class="text-md">
-                <h5 class="font-medium text-gray-900 mb-2">Single Day Reservation</h5>
-                <div class="bg-white p-3 rounded border">
-                    <p class="font-medium text-blue-600 mb-1">📅 ${detail.start_date}</p>
-                    <p class="text-gray-600">⏰ ${detail.time_from} - ${detail.time_to}</p>
-                </div>
-            </div>
-        `;
-    } else if (data.reservation_type === 'Consecutive') {
-        return `
-            <div class="text-sm">
-                <h5 class="font-medium text-gray-900 mb-2">Consecutive Days Reservation</h5>
-                <div class="space-y-2">
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-blue-600">📅 Start Date: ${detail.start_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.start_time_from} - ${detail.start_time_to}</p>
-                    </div>
-                    ${detail.intermediate_date ? `
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-green-600">📅 Intermediate Date: ${detail.intermediate_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.intermediate_time_from || detail.start_time_from} - ${detail.intermediate_time_to || detail.start_time_to}</p>
-                    </div>
-                    ` : ''}
-                    ${detail.end_date ? `
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-red-600">📅 End Date: ${detail.end_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.end_time_from || detail.start_time_from} - ${detail.end_time_to || detail.start_time_to}</p>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    } else if (data.reservation_type === 'Multiple') {
-        return `
-            <div class="text-sm">
-                <h5 class="font-medium text-gray-900 mb-2">Multiple Days Reservation</h5>
-                <div class="space-y-2">
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-blue-600">📅 First Date: ${detail.start_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.start_time_from} - ${detail.start_time_to}</p>
-                    </div>
-                    ${detail.intermediate_date ? `
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-green-600">📅 Intermediate Date: ${detail.intermediate_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.intermediate_time_from || detail.start_time_from} - ${detail.intermediate_time_to || detail.start_time_to}</p>
-                    </div>
-                    ` : ''}
-                    ${detail.end_date ? `
-                    <div class="bg-white p-3 rounded border">
-                        <p class="font-medium text-purple-600">📅 Second Date: ${detail.end_date}</p>
-                        <p class="text-gray-600">⏰ ${detail.end_time_from || detail.start_time_from} - ${detail.end_time_to || detail.start_time_to}</p>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
     }
 }
 
@@ -514,6 +439,91 @@ function handleReservationAction(action) {
             const statusBadge = document.querySelector('.px-3.py-1.text-xs.font-semibold.rounded-full');
             if (statusBadge) {
                 statusBadge.className = `px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(data.status)}`;
+                statusBadge.textContent = data.status.toUpperCase();
+            }
+            
+            // Optionally refresh the page after a delay
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            showNotification(data.message || `Error ${confirmText} reservation`, 'error');
+            // Re-enable buttons on error
+            acceptBtn.disabled = false;
+            declineBtn.disabled = false;
+            acceptBtn.textContent = 'Accept';
+            declineBtn.textContent = 'Decline';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(`Error ${confirmText} reservation`, 'error');
+        // Re-enable buttons on error
+        acceptBtn.disabled = false;
+        declineBtn.disabled = false;
+        acceptBtn.textContent = 'Accept';
+        declineBtn.textContent = 'Decline';
+    });
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+
+function handleReservationAction(action) {
+    if (!currentReservationId) return;
+    
+    const actionText = action === 'accept' ? 'accept' : 'decline';
+    const confirmText = action === 'accept' ? 'accepting' : 'declining';
+    
+    if (!confirm(`Are you sure you want to ${actionText} this reservation?`)) {
+        return;
+    }
+    
+    // Disable buttons during request
+    const acceptBtn = document.getElementById('acceptBtn');
+    const declineBtn = document.getElementById('declineBtn');
+    acceptBtn.disabled = true;
+    declineBtn.disabled = true;
+    acceptBtn.textContent = action === 'accept' ? 'Processing...' : acceptBtn.textContent;
+    declineBtn.textContent = action === 'decline' ? 'Processing...' : declineBtn.textContent;
+    
+    // Use the same endpoints as the reservation page
+    fetch(`/admin/reservations/${currentReservationId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showNotification(`Reservation ${action}ed successfully!`, 'success');
+            
+            // Update button states
+            updateButtonStates(data.status);
+            
+            // Update the status badge in the modal
+            const statusBadge = document.querySelector('.px-3.py-1.text-sm.font-semibold.rounded-sm');
+            if (statusBadge) {
+                statusBadge.className = `px-3 py-1 text-sm font-semibold rounded-sm ${getStatusColor(data.status)}`;
                 statusBadge.textContent = data.status.toUpperCase();
             }
             

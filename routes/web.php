@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\admin\AdminEquipmentsController;
 use App\Http\Controllers\Admin\AdminFacilityBlockController;
 use App\Http\Controllers\admin\AdminFacilityController;
+use App\Http\Controllers\Admin\AdminReservationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EquipmentsController;
@@ -42,20 +43,32 @@ Route::prefix('admin')->group(function () {
     // Dashboard
     Route::get('/', [AdminDashboardController::class, 'adminDashboard']);
 
+    // Dashboard specific reservation actions (for quick actions on dashboard)
+    Route::get('/dashboard/reservation/{id}/details', [AdminDashboardController::class, 'getReservationDetails'])->name('admin.dashboard.reservation.details');
+    Route::post('/dashboard/reservation/{id}/accept', [AdminDashboardController::class, 'acceptReservation'])->name('admin.dashboard.reservation.accept');
+    Route::post('/dashboard/reservation/{id}/decline', [AdminDashboardController::class, 'declineReservation'])->name('admin.dashboard.reservation.decline');
+
     // Calendar route for admin
     Route::get('/calendar', function() {
         return app(CalendarController::class)->index(request()->merge(['admin' => true]));
     })->name('admin.calendar');
 
-    // Reservation route for admin (reuse dashboard controller)
-    Route::get('/reservation', [AdminDashboardController::class, 'adminDashboard'])->name('admin.reservation');
-    
-    // Route for fetching reservation details via AJAX
-    Route::get('/reservation/{id}/details', [AdminDashboardController::class, 'getReservationDetails'])->name('admin.reservation.details');
-    
-    // Routes for accepting and declining reservations
-    Route::post('/reservation/{id}/accept', [AdminDashboardController::class, 'acceptReservation'])->name('admin.reservation.accept');
-    Route::post('/reservation/{id}/decline', [AdminDashboardController::class, 'declineReservation'])->name('admin.reservation.decline');
+    // Reservation routes - using dedicated AdminReservationController
+    Route::prefix('reservations')->name('admin.reservations.')->group(function () {
+        Route::get('/', [AdminReservationController::class, 'index'])->name('index');
+        Route::get('/{id}/details', [AdminReservationController::class, 'show'])->name('show');
+        Route::post('/{id}/accept', [AdminReservationController::class, 'accept'])->name('accept');
+        Route::post('/{id}/decline', [AdminReservationController::class, 'decline'])->name('decline');
+        Route::post('/{id}/complete', [AdminReservationController::class, 'complete'])->name('complete');
+        Route::post('/{id}/cancel', [AdminReservationController::class, 'cancel'])->name('cancel');
+        Route::delete('/{id}', [AdminReservationController::class, 'destroy'])->name('destroy');
+        Route::get('/status/{status}', [AdminReservationController::class, 'getByStatus'])->name('by-status');
+    });
+
+    // Legacy route for backward compatibility (redirect to new reservations page)
+    Route::get('/reservation', function() {
+        return redirect()->route('admin.reservations.index');
+    })->name('admin.reservation');
 
     // Facilities routes
     Route::prefix('facilities')->group(function () {
