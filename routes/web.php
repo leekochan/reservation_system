@@ -49,6 +49,13 @@ Route::prefix('admin')->group(function () {
 
     // Reservation route for admin (reuse dashboard controller)
     Route::get('/reservation', [AdminDashboardController::class, 'adminDashboard'])->name('admin.reservation');
+    
+    // Route for fetching reservation details via AJAX
+    Route::get('/reservation/{id}/details', [AdminDashboardController::class, 'getReservationDetails'])->name('admin.reservation.details');
+    
+    // Routes for accepting and declining reservations
+    Route::post('/reservation/{id}/accept', [AdminDashboardController::class, 'acceptReservation'])->name('admin.reservation.accept');
+    Route::post('/reservation/{id}/decline', [AdminDashboardController::class, 'declineReservation'])->name('admin.reservation.decline');
 
     // Facilities routes
     Route::prefix('facilities')->group(function () {

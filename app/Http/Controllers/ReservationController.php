@@ -101,7 +101,7 @@ class ReservationController extends Controller
                 }
             }
 
-            // Create the reservation request
+                        // Create the reservation request
             $reservation = ReservationRequest::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -114,7 +114,7 @@ class ReservationController extends Controller
                 'transaction_date' => $validated['transaction_date'],
                 'reservation_type' => ucfirst($validated['reservation_type']),
                 'facility_id' => $validated['facility_id'],
-                'equipment_id' => 1, // Default equipment_id (you may need to adjust this based on your data)
+                'equipment_id' => null, // No default equipment - use pivot table for equipment relationships
                 'signature' => $signaturePath,
                 'status' => 'pending',
                 'total_payment' => '0', // You'll calculate this later

@@ -42,11 +42,10 @@
                                 <img src="{{ asset('pictures/icons/edit.png') }}" alt="Edit" class="w-5 h-5">
                             </button>
                             <form action="{{ route('facilities.destroy', $facility->facility_id) }}" method="POST"
-                                  x-data="{ confirmDelete() { if(confirm('Are you sure you want to delete this facility?')) { this.$el.submit(); } } }"
-                                  @submit.prevent="confirmDelete">
+                                  onsubmit="return confirm('Are you sure you want to delete this facility?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" class="hover:bg-gray-200 p-1 rounded">
+                                <button type="submit" class="hover:bg-gray-200 p-1 rounded">
                                     <img src="{{ asset('pictures/icons/delete.png') }}" alt="Delete" class="w-5 h-5">
                                 </button>
                             </form>
@@ -169,17 +168,17 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block font-semibold mb-1">Hourly Rate:</label>
-                                <input type="number" name="facility_per_hour_rate" step="0.01" min="0"
+                                <input name="facility_per_hour_rate" step="0.01" min="0"
                                        class="w-full border px-3 py-2 rounded">
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1">Package 1:</label>
-                                <input type="number" name="facility_package_rate1" step="0.01" min="0"
+                                <input name="facility_package_rate1" step="0.01" min="0"
                                        class="w-full border px-3 py-2 rounded">
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1">Package 2:</label>
-                                <input type="number" name="facility_package_rate2" step="0.01" min="0"
+                                <input name="facility_package_rate2" step="0.01" min="0"
                                        class="w-full border px-3 py-2 rounded">
                             </div>
                         </div>
