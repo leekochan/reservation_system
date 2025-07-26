@@ -160,9 +160,20 @@ function displayReservations(reservations) {
 function createReservationCard(reservation) {
     const statusClass = `status-${reservation.status}`;
     const facilityName = reservation.facility ? reservation.facility.facility_name : 'N/A';
-    const equipmentList = reservation.equipments && reservation.equipments.length > 0 
-        ? reservation.equipments.map(eq => eq.equipment_name).join(', ')
-        : 'No equipment';
+    
+    // Equipment display logic - show only first equipment if multiple
+    let equipmentInfo = 'No equipment';
+    if (reservation.equipments && reservation.equipments.length > 0) {
+        const firstEquipment = reservation.equipments[0];
+        const quantity = firstEquipment.quantity || 1;
+        const equipmentName = quantity > 1 ? `${firstEquipment.equipment_name} (${quantity})` : firstEquipment.equipment_name;
+        
+        if (reservation.equipments.length > 1) {
+            equipmentInfo = `${equipmentName} (+${reservation.equipments.length - 1} more)`;
+        } else {
+            equipmentInfo = equipmentName;
+        }
+    }
     
     const reservationDetail = reservation.reservation_detail;
     let scheduleInfo = 'Schedule not available';
@@ -193,28 +204,28 @@ function createReservationCard(reservation) {
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
-                        ${facilityName}
+                        <span class="font-medium mr-2">Facility:</span>${facilityName}
                     </div>
                     
                     <div class="flex items-center text-sm text-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        ${scheduleInfo}
+                        <span class="font-medium mr-2">Schedule:</span>${scheduleInfo}
                     </div>
                     
                     <div class="flex items-center text-sm text-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
-                        ${equipmentList}
+                        <span class="font-medium mr-2">Equipment:</span>${equipmentInfo}
                     </div>
                     
                     <div class="flex items-center text-sm text-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 01-1-1V5a1 1 0 011-1h4z"></path>
                         </svg>
-                        ${reservation.reservation_type}
+                        <span class="font-medium mr-2">Type:</span>${reservation.reservation_type}
                     </div>
                 </div>
                 
@@ -267,8 +278,11 @@ function showReservationModal(reservation) {
     
     // Create equipment list
     let equipmentInfo = 'No equipment requested';
-    if (reservation.equipment && reservation.equipment.equipment_name) {
-        equipmentInfo = reservation.equipment.equipment_name;
+    if (reservation.equipments && reservation.equipments.length > 0) {
+        equipmentInfo = reservation.equipments.map(eq => {
+            const quantity = eq.quantity || 1;
+            return `${eq.equipment_name} (Qty: ${quantity})`;
+        }).join(', ');
     }
     
     // Create schedule information
@@ -386,19 +400,6 @@ function showReservationModal(reservation) {
             <p class="text-sm text-gray-700 bg-gray-50 p-4 rounded-md leading-relaxed">${reservation.purpose}</p>
         </div>
 
-        <!-- Complete Schedule Details Section -->
-        <div class="mb-6 bg-white p-5 rounded-lg border shadow-sm">
-            <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                Complete Schedule Details
-            </h3>
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
-                ${getCompleteScheduleDetails(reservation)}
-            </div>
-        </div>
-
         ${reservation.instruction ? `
         <div class="mb-6 bg-white p-5 rounded-lg border shadow-sm">
             <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
@@ -407,9 +408,22 @@ function showReservationModal(reservation) {
                 </svg>
                 Special Instructions
             </h3>
-            <p class="text-sm text-gray-700 bg-red-50 p-4 rounded-md leading-relaxed border-l-4 border-red-400">${reservation.instruction}</p>
+            <p class="text-sm text-gray-700 bg-gray-50 p-4 rounded-md leading-relaxed border-l-4 border-red-400">${reservation.instruction}</p>
         </div>
         ` : ''}
+
+        <!-- Schedule Date -->
+        <div class="mb-6 bg-white p-5 rounded-lg border shadow-sm">
+            <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Scheduled Date
+            </h3>
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
+                ${getCompleteScheduleDetails(reservation)}
+            </div>
+        </div>
 
         ${reservation.signature ? `
         <div class="mb-6 bg-white p-5 rounded-lg border shadow-sm">
@@ -549,6 +563,33 @@ function getTimeAgo(dateString) {
     return 'Just now';
 }
 
+// Helper function to get equipment for a specific date
+function getEquipmentForDate(reservation, targetDate) {
+    if (!reservation.equipments || reservation.equipments.length === 0) {
+        return '';
+    }
+    
+    const equipmentForDate = reservation.equipments.filter(eq => eq.reservation_date === targetDate);
+    
+    if (equipmentForDate.length === 0) {
+        return '';
+    }
+    
+    return `
+        <div class="mt-2 pt-2 border-t border-gray-200">
+            <div class="flex items-center mb-1">
+                <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-xs font-medium text-gray-600">Equipment:</span>
+            </div>
+            <div class="text-xs text-gray-700 bg-blue-50 p-2 rounded">
+                ${equipmentForDate.map(eq => `🔧 ${eq.equipment_name} (Qty: ${eq.quantity})`).join('<br>')}
+            </div>
+        </div>
+    `;
+}
+
 // Helper function to get complete schedule details
 function getCompleteScheduleDetails(reservation) {
     if (!reservation.reservation_detail) return '<p class="text-sm text-gray-600">No schedule details available.</p>';
@@ -569,6 +610,7 @@ function getCompleteScheduleDetails(reservation) {
                     <div class="flex items-center text-gray-600">
                         <span class="text-sm">⏰ ${detail.time_from} - ${detail.time_to}</span>
                     </div>
+                    ${getEquipmentForDate(reservation, detail.start_date)}
                 </div>
             </div>
         `;
@@ -586,6 +628,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">START</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.start_time_from} - ${detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.start_date)}
                     </div>
                     ${detail.intermediate_date ? `
                     <div class="bg-white p-4 rounded-lg border shadow-sm border-dashed border-yellow-300">
@@ -594,6 +637,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">MIDDLE</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.intermediate_time_from || detail.start_time_from} - ${detail.intermediate_time_to || detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.intermediate_date)}
                     </div>
                     ` : ''}
                     ${detail.end_date ? `
@@ -603,6 +647,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">END</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.end_time_from || detail.start_time_from} - ${detail.end_time_to || detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.end_date)}
                     </div>
                     ` : ''}
                 </div>
@@ -622,6 +667,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">FIRST</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.start_time_from} - ${detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.start_date)}
                     </div>
                     ${detail.intermediate_date ? `
                     <div class="bg-white p-4 rounded-lg border shadow-sm border-dashed border-yellow-300">
@@ -630,6 +676,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">MIDDLE</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.intermediate_time_from || detail.start_time_from} - ${detail.intermediate_time_to || detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.intermediate_date)}
                     </div>
                     ` : ''}
                     ${detail.end_date ? `
@@ -639,6 +686,7 @@ function getCompleteScheduleDetails(reservation) {
                             <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded">SECOND</span>
                         </div>
                         <p class="text-gray-600 text-sm mt-1">⏰ ${detail.end_time_from || detail.start_time_from} - ${detail.end_time_to || detail.start_time_to}</p>
+                        ${getEquipmentForDate(reservation, detail.end_date)}
                     </div>
                     ` : ''}
                 </div>

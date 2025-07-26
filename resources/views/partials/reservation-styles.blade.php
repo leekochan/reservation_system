@@ -65,6 +65,24 @@
         color: #aaa;
         cursor: not-allowed;
     }
+    .pending {
+        background-color: #ffe6cc;
+        color: #cc6600;
+        border: 1px solid #ffb366;
+        cursor: pointer;
+        position: relative;
+    }
+    .pending:hover {
+        background-color: #ffd9b3;
+    }
+    .pending::after {
+        content: "⚠";
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 10px;
+        color: #cc6600;
+    }
     .selected {
         background-color: #7B172E;
         color: white;
@@ -182,6 +200,41 @@
         border-radius: 4px;
     }
 
+    /* Field validation styles */
+    .field-feedback {
+        animation: slideInDown 0.3s ease-out;
+        pointer-events: none;
+    }
+
+    .field-feedback::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 20px;
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-bottom: 6px solid #ef4444;
+    }
+
+    .validation-highlight {
+        border: 2px solid #ef4444 !important;
+        background-color: #fef2f2 !important;
+        animation: shake 0.5s ease-in-out;
+    }
+
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     .units-input:disabled {
         background-color: #f5f5f5;
         cursor: not-allowed;
@@ -211,5 +264,85 @@
         border-radius: 4px;
         padding: 5px;
         background-color: white;
+    }
+
+    /* Validation Error Styles */
+    .validation-error {
+        position: relative;
+        animation: shake 0.5s ease-in-out;
+    }
+
+    .validation-error::after {
+        content: '⚠️';
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        z-index: 10;
+    }
+
+    .validation-error input,
+    .validation-error select {
+        border-color: #ef4444 !important;
+        background-color: #fef2f2 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+    }
+
+    .validation-error .calendar {
+        border-color: #ef4444 !important;
+        background-color: #fef2f2 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+
+    @keyframes pulse {
+        0% { 
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            transform: scale(1);
+        }
+        50% { 
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            transform: scale(1.02);
+        }
+        100% { 
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            transform: scale(1);
+        }
+    }
+
+    /* Focus styles for better accessibility */
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+
+    /* Validation message styles */
+    #validation-message {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
     }
 </style>

@@ -89,6 +89,14 @@ class ReservationController extends Controller
             }
         }
 
+        // Check for overlapping reservations (only for single reservations)
+        if ($validated['reservation_type'] === 'single') {
+            $overlapError = $this->checkForOverlappingReservations($validated);
+            if ($overlapError) {
+                return redirect()->back()->withErrors(['overlap' => $overlapError])->withInput();
+            }
+        }
+
         DB::beginTransaction();
         try {
             // Handle signature file upload
@@ -220,5 +228,129 @@ class ReservationController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    /**
+     * Check for overlapping reservations before creating a new one
+     */
+    protected function checkForOverlappingReservations($validated)
+    {
+        $facilityId = $validated['facility_id'];
+        $reservationType = $validated['reservation_type'];
+        $dates = $validated['dates'] ?? [];
+
+        foreach ($dates as $dateData) {
+            $date = $dateData['date'];
+            $timeFrom = $dateData['time_from'];
+            $timeTo = $dateData['time_to'];
+
+            // Get all existing accepted reservations for this facility and date
+            $existingReservations = ReservationRequest::where('facility_id', $facilityId)
+                ->where('status', 'accepted')
+                ->where(function($query) use ($date) {
+                    $query->whereHasMorph(
+                        'reservationDetail',
+                        [Single::class, Consecutive::class, Multiple::class],
+                        function($q, $type) use ($date) {
+                            if ($type === Single::class) {
+                                $q->where('start_date', $date);
+                            } elseif ($type === Consecutive::class) {
+                                $q->where(function($subQuery) use ($date) {
+                                    $subQuery->where('start_date', $date)
+                                        ->orWhere('end_date', $date)
+                                        ->orWhere('intermediate_date', $date);
+                                });
+                            } elseif ($type === Multiple::class) {
+                                $q->where(function($subQuery) use ($date) {
+                                    $subQuery->where('start_date', $date)
+                                        ->orWhere('end_date', $date)
+                                        ->orWhere('intermediate_date', $date);
+                                });
+                            }
+                        }
+                    );
+                })
+                ->with('reservationDetail')
+                ->get();
+
+            // Check each existing reservation for time overlap
+            foreach ($existingReservations as $existingReservation) {
+                $detail = $existingReservation->reservationDetail;
+                $existingTimes = [];
+
+                if ($detail instanceof Single) {
+                    if ($detail->start_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->time_from,
+                            'to' => $detail->time_to
+                        ];
+                    }
+                } elseif ($detail instanceof Consecutive) {
+                    if ($detail->start_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->start_time_from,
+                            'to' => $detail->start_time_to
+                        ];
+                    }
+                    if ($detail->end_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->end_time_from,
+                            'to' => $detail->end_time_to
+                        ];
+                    }
+                    if ($detail->intermediate_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->intermediate_time_from,
+                            'to' => $detail->intermediate_time_to
+                        ];
+                    }
+                } elseif ($detail instanceof Multiple) {
+                    if ($detail->start_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->start_time_from,
+                            'to' => $detail->start_time_to
+                        ];
+                    }
+                    if ($detail->end_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->end_time_from,
+                            'to' => $detail->end_time_to
+                        ];
+                    }
+                    if ($detail->intermediate_date === $date) {
+                        $existingTimes[] = [
+                            'from' => $detail->intermediate_time_from,
+                            'to' => $detail->intermediate_time_to
+                        ];
+                    }
+                }
+
+                // Check for time overlaps with buffer
+                foreach ($existingTimes as $existingTime) {
+                    if ($this->timesOverlap($timeFrom, $timeTo, $existingTime['from'], $existingTime['to'])) {
+                        return "Time conflict detected on {$date} from {$timeFrom} to {$timeTo}. This time overlaps with an existing reservation from {$existingTime['from']} to {$existingTime['to']}.";
+                    }
+                }
+            }
+        }
+
+        return null; // No overlaps found
+    }
+
+    /**
+     * Check if two time ranges overlap (including 1-hour buffer)
+     */
+    protected function timesOverlap($newFrom, $newTo, $existingFrom, $existingTo)
+    {
+        // Add 1-hour buffer around existing reservation
+        $bufferedStart = date('H:i', strtotime($existingFrom . ' -1 hour'));
+        $bufferedEnd = date('H:i', strtotime($existingTo . ' +1 hour'));
+        
+        // Ensure buffer doesn't go outside business hours
+        if ($bufferedStart < '08:00') $bufferedStart = '08:00';
+        if ($bufferedEnd > '17:30') $bufferedEnd = '17:30';
+
+        // Check if new reservation overlaps with buffered existing reservation
+        return !($newTo <= $bufferedStart || $newFrom >= $bufferedEnd);
     }
 }

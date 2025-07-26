@@ -34,6 +34,9 @@
 
         // Initialize calendar
         renderCalendar();
+        
+        // Initialize real-time validation
+        setupRealTimeValidation();
 
         function initSignatureUpload() {
             const signatureUpload = document.getElementById('signature-upload');
@@ -92,10 +95,14 @@
                 selectedDate = null;
                 selectedMultipleDates = [];
 
-                // Reset selections
+                // Reset selections but preserve pending states
                 const selectedDays = document.querySelectorAll('.calendar-day.selected, .calendar-day.consecutive-date, .calendar-day.multiple-date');
                 selectedDays.forEach(day => {
                     day.classList.remove('selected', 'consecutive-date', 'multiple-date');
+                    // Re-add available class if it was removed and not pending/unavailable
+                    if (!day.classList.contains('pending') && !day.classList.contains('unavailable') && !day.classList.contains('no-facility') && !day.classList.contains('other-month')) {
+                        day.classList.add('available');
+                    }
                 });
 
                 // Hide/show options
@@ -222,10 +229,26 @@
                     // Check if date is unavailable
                     const isUnavailable = data.unavailable.includes(dateString);
 
+                    // Check if date has pending reservations
+                    const isPending = data.pending && data.pending.includes(dateString);
+
                     // Check if date is start of consecutive range
                     let isConsecutiveStart = false;
+                    let consecutiveHasPending = false;
                     if (reservationType === 'consecutive' && daysCount) {
-                        isConsecutiveStart = data.consecutive.some(range => range[0] === dateString);
+                        const consecutiveRange = data.consecutive.find(range => {
+                            if (Array.isArray(range)) {
+                                return range[0] === dateString;
+                            } else if (range.dates) {
+                                return range.dates[0] === dateString;
+                            }
+                            return false;
+                        });
+                        
+                        if (consecutiveRange) {
+                            isConsecutiveStart = true;
+                            consecutiveHasPending = consecutiveRange.has_pending || false;
+                        }
                     }
 
                     // Set class based on availability
@@ -237,7 +260,9 @@
                     } else if (isUnavailable) {
                         dayClass += 'unavailable';
                     } else if (isConsecutiveStart) {
-                        dayClass += 'consecutive-date';
+                        dayClass += consecutiveHasPending ? 'consecutive-date pending' : 'consecutive-date';
+                    } else if (isPending) {
+                        dayClass += 'available pending';
                     } else {
                         dayClass += 'available';
                     }
@@ -246,6 +271,11 @@
                     dayElement.className = dayClass;
                     dayElement.textContent = i;
                     dayElement.dataset.date = dateString;
+
+                    // Add tooltip for pending dates
+                    if (isPending || consecutiveHasPending) {
+                        dayElement.title = 'Warning: There is a pending reservation for this date';
+                    }
 
                     // Only make clickable if available and not in past
                     if (selectedFacility && !isPast && (isConsecutiveStart || (reservationType !== 'consecutive' && !isUnavailable))) {
@@ -277,16 +307,21 @@
 
         // Handle date selection
         function handleDateSelection(dateString) {
-            // Clear previous selections
+            // Clear previous selections but preserve pending states
             const selectedDays = document.querySelectorAll('.calendar-day.selected, .calendar-day.consecutive-date, .calendar-day.multiple-date');
             selectedDays.forEach(day => {
                 day.classList.remove('selected', 'consecutive-date', 'multiple-date');
+                // Re-add available class if it was removed
+                if (!day.classList.contains('pending') && !day.classList.contains('unavailable') && !day.classList.contains('no-facility') && !day.classList.contains('other-month')) {
+                    day.classList.add('available');
+                }
             });
 
             // Mark the selected date(s)
             if (reservationType === 'single') {
                 const dayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
                 dayElement.classList.add('selected');
+                dayElement.classList.remove('available');
                 selectedDate = dateString;
                 updateDateTimeInputs(dateString);
             }
@@ -306,12 +341,14 @@
                     const dayElement = document.querySelector(`.calendar-day[data-date="${dateStr}"]`);
                     if (dayElement) {
                         dayElement.classList.add('consecutive-date');
+                        dayElement.classList.remove('available');
                     }
                 });
 
                 // Mark the first date as selected
                 const firstDayElement = document.querySelector(`.calendar-day[data-date="${dateString}"]`);
                 firstDayElement.classList.add('selected');
+
                 selectedDate = dateString;
 
                 // Update both date-time inputs and equipment inputs
@@ -322,10 +359,15 @@
 
                 if (dayElement.classList.contains('multiple-date')) {
                     dayElement.classList.remove('multiple-date');
+                    // Re-add available class
+                    if (!dayElement.classList.contains('pending') && !dayElement.classList.contains('unavailable')) {
+                        dayElement.classList.add('available');
+                    }
                     selectedMultipleDates = selectedMultipleDates.filter(d => d !== dateString);
                 } else {
                     if (selectedMultipleDates.length < maxMultipleDates) {
                         dayElement.classList.add('multiple-date');
+                        dayElement.classList.remove('available');
                         selectedMultipleDates.push(dateString);
                     }
                 }
@@ -400,12 +442,21 @@
                         const dayElement = document.querySelector(`.calendar-day[data-date="${dateToRemove}"]`);
                         if (dayElement) {
                             dayElement.classList.remove('multiple-date');
+                            // Re-add available class if not pending/unavailable
+                            if (!dayElement.classList.contains('pending') && !dayElement.classList.contains('unavailable')) {
+                                dayElement.classList.add('available');
+                            }
                         }
                         updateDateTimeInputs(selectedMultipleDates);
                     });
                 }
 
                 multipleDatesContainer.appendChild(group);
+
+                // Update time options for this date with availability data
+                if (selectedFacility) {
+                    updateTimeOptionsForDate(group, dateStr);
+                }
             });
         }
 
@@ -426,15 +477,107 @@
         }
 
         // Helper function to generate time options
-        function generateTimeOptions() {
+        function generateTimeOptions(availableTimes = null) {
             let options = '';
-            for (let hour = 8; hour <= 17; hour++) {
-                for (let minute = 0; minute < 60; minute += 30) {
-                    const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            
+            if (availableTimes && availableTimes.length > 0) {
+                // Use filtered available times
+                availableTimes.forEach(time => {
                     options += `<option value="${time}">${time}</option>`;
+                });
+            } else {
+                // Default: all time slots from 8:00 to 17:30
+                for (let hour = 8; hour <= 17; hour++) {
+                    for (let minute = 0; minute < 60; minute += 30) {
+                        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        options += `<option value="${time}">${time}</option>`;
+                    }
                 }
             }
             return options;
+        }
+
+        // Function to fetch available times for a specific date and facility
+        async function fetchAvailableTimes(facilityId, date) {
+            try {
+                const response = await fetch(`/api/time-availability/${facilityId}?date=${date}`);
+                const data = await response.json();
+                return data.available_times || [];
+            } catch (error) {
+                console.error('Error fetching available times:', error);
+                return [];
+            }
+        }
+
+        // Function to update time options for a specific date group
+        async function updateTimeOptionsForDate(dateGroup, date) {
+            const facilityId = selectedFacility;
+            if (!facilityId) return;
+
+            const availableTimes = await fetchAvailableTimes(facilityId, date);
+            const timeFromSelect = dateGroup.querySelector('.time-from');
+            const timeToSelect = dateGroup.querySelector('.time-to');
+
+            // Store current selections
+            const currentTimeFrom = timeFromSelect.value;
+            const currentTimeTo = timeToSelect.value;
+
+            // Update options
+            timeFromSelect.innerHTML = generateTimeOptions(availableTimes);
+            timeToSelect.innerHTML = generateTimeOptions(availableTimes);
+
+            // Restore selections if still available
+            if (availableTimes.includes(currentTimeFrom)) {
+                timeFromSelect.value = currentTimeFrom;
+            }
+            if (availableTimes.includes(currentTimeTo)) {
+                timeToSelect.value = currentTimeTo;
+            }
+
+            // Add event listeners for time validation
+            addTimeValidationListeners(dateGroup, availableTimes);
+        }
+
+        // Function to add time validation listeners
+        function addTimeValidationListeners(dateGroup, availableTimes) {
+            const timeFromSelect = dateGroup.querySelector('.time-from');
+            const timeToSelect = dateGroup.querySelector('.time-to');
+
+            timeFromSelect.addEventListener('change', function() {
+                updateTimeToOptions(timeFromSelect, timeToSelect, availableTimes);
+            });
+
+            timeToSelect.addEventListener('change', function() {
+                validateTimeSelection(timeFromSelect, timeToSelect);
+            });
+        }
+
+        // Function to update "Time To" options based on "Time From" selection
+        function updateTimeToOptions(timeFromSelect, timeToSelect, availableTimes) {
+            const selectedFromTime = timeFromSelect.value;
+            if (!selectedFromTime) return;
+
+            // Filter "Time To" options to only include times after "Time From"
+            const validToTimes = availableTimes.filter(time => time > selectedFromTime);
+            
+            const currentTimeTo = timeToSelect.value;
+            timeToSelect.innerHTML = generateTimeOptions(validToTimes);
+
+            // Restore selection if still valid
+            if (validToTimes.includes(currentTimeTo)) {
+                timeToSelect.value = currentTimeTo;
+            }
+        }
+
+        // Function to validate time selection
+        function validateTimeSelection(timeFromSelect, timeToSelect) {
+            const timeFrom = timeFromSelect.value;
+            const timeTo = timeToSelect.value;
+
+            if (timeFrom && timeTo && timeTo <= timeFrom) {
+                alert('End time must be after start time');
+                timeToSelect.value = '';
+            }
         }
 
         // Sample equipment data (in real app, this would come from backend)
@@ -641,25 +784,19 @@
             
             console.log('Final submit button clicked');
 
-            // Ensure all form fields are included regardless of page visibility
-            ensureAllFormFieldsIncluded();
-
-            // Basic validation
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const organization = document.getElementById('organization').value;
-            const purpose = document.getElementById('purpose').value;
-            const otherDetails = document.getElementById('other_details').value;
-            const facilityId = document.getElementById('facility-select').value;
+            // Comprehensive validation
+            const validationResult = validateAllRequiredFields();
             
-            console.log('Validating required fields:', {
-                name, email, organization, purpose, otherDetails, facilityId
-            });
-            
-            if (!name || !email || !organization || !purpose || !otherDetails || !facilityId) {
-                alert('❌ Please fill in all required fields:\n• Name\n• Email\n• Organization\n• Purpose\n• Other Details\n• Facility');
+            if (!validationResult.isValid) {
+                console.log('Validation failed:', validationResult.emptyFields);
+                // Smoothly guide user to first empty field without overwhelming notifications
+                scrollToFirstEmptyField(validationResult.emptyFields[0]);
+                highlightEmptyFields(validationResult.emptyFields);
+                showMinimalValidationFeedback(validationResult.emptyFields[0]);
                 return;
             }
+
+            console.log('Validation passed, proceeding with submission');
 
             // Check if signature file is uploaded (optional)
             if (selectedSignatureFile) {
@@ -672,7 +809,12 @@
             addHiddenFields();
             
             // Show confirmation
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const organization = document.getElementById('organization').value;
             const facilityName = document.getElementById('facility-select').selectedOptions[0]?.text || 'Selected facility';
+            const purpose = document.getElementById('purpose').value;
+            
             const confirmation = confirm(`🎯 Ready to submit your reservation?\n\n👤 Name: ${name}\n📧 Email: ${email}\n🏢 Organization: ${organization}\n🏫 Facility: ${facilityName}\n📝 Purpose: ${purpose}\n\nClick OK to submit or Cancel to review.`);
             
             if (confirmation) {
@@ -681,29 +823,373 @@
                 // Submit form directly without preventDefault interference
                 const form = document.getElementById('reservation-form');
                 console.log('🚀 Submitting form to:', form.action);
+                console.log('Form method:', form.method);
+                console.log('Form data being submitted:', new FormData(form));
                 
                 // Disable the submit button to prevent double submission
                 document.getElementById('final-submit-btn').disabled = true;
                 document.getElementById('final-submit-btn').innerHTML = '⏳ Submitting...';
                 
+                // Submit the form
                 form.submit();
             } else {
                 console.log('❌ User cancelled submission');
             }
         });
 
-        function ensureAllFormFieldsIncluded() {
-            // Make all form pages visible temporarily to ensure all form fields are included
-            const allPages = document.querySelectorAll('.form-page');
-            allPages.forEach(page => {
-                page.style.display = 'block';
-                page.style.visibility = 'hidden';
-                page.style.position = 'absolute';
-                page.style.zIndex = '-1';
+        function validateAllRequiredFields() {
+            const requiredFields = [
+                // 1. Start with reservation setup
+                { id: 'reservation_type', label: 'Reservation Type', type: 'radio' },
+                { id: 'facility-select', label: 'Facility', type: 'select' },
+                
+                // 2. Purpose and details 
+                { id: 'purpose', label: 'Purpose', type: 'text' },
+                { id: 'other_details', label: 'Other Details', type: 'text' },
+                
+                // 3. Personal information
+                { id: 'name', label: 'Name', type: 'text' },
+                { id: 'email', label: 'Email', type: 'email' },
+                { id: 'organization', label: 'Organization', type: 'text' },
+                
+                // 4. Equipment preferences
+                { id: 'need_equipment', label: 'Need Equipment', type: 'radio' },
+                { id: 'personal_equipment', label: 'Personal Equipment', type: 'radio' }
+            ];
+
+            const emptyFields = [];
+
+            for (const field of requiredFields) {
+                const element = document.getElementById(field.id);
+                let isEmpty = false;
+                let validationMessage = '';
+
+                if (field.type === 'radio') {
+                    const radioButtons = document.querySelectorAll(`input[name="${field.id}"]`);
+                    const isChecked = Array.from(radioButtons).some(radio => radio.checked);
+                    if (!isChecked) {
+                        isEmpty = true;
+                    }
+                } else if (field.type === 'select') {
+                    if (!element.value || element.value === '') {
+                        isEmpty = true;
+                    }
+                } else if (field.type === 'email') {
+                    const emailValue = element.value.trim();
+                    if (!emailValue) {
+                        isEmpty = true;
+                    } else {
+                        // Email format validation
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(emailValue)) {
+                            isEmpty = true;
+                            validationMessage = 'Please enter a valid email address';
+                        }
+                    }
+                } else {
+                    if (!element.value.trim()) {
+                        isEmpty = true;
+                    }
+                }
+
+                if (isEmpty) {
+                    emptyFields.push({
+                        ...field,
+                        validationMessage: validationMessage || `${field.label} is required`
+                    });
+                }
+            }
+
+            // Check reservation-specific fields (dates come after reservation type is selected)
+            const reservationType = document.querySelector('input[name="reservation_type"]:checked')?.value;
+            
+            if (reservationType === 'consecutive') {
+                const daysCount = document.getElementById('days-count').value;
+                if (!daysCount) {
+                    emptyFields.push({ id: 'days-count', label: 'Number of Days', type: 'select', validationMessage: 'Please select the number of days' });
+                }
+            }
+
+            // Check if dates are selected (this comes after reservation type and facility are selected)
+            if (reservationType && selectedFacility) {
+                if (reservationType === 'single' && !selectedDate) {
+                    emptyFields.push({ id: 'calendar-container', label: 'Date Selection', type: 'calendar', validationMessage: 'Please select a date' });
+                } else if (reservationType === 'consecutive' && !selectedDate) {
+                    emptyFields.push({ id: 'calendar-container', label: 'Date Selection', type: 'calendar', validationMessage: 'Please select consecutive dates' });
+                } else if (reservationType === 'multiple' && selectedMultipleDates.length < 2) {
+                    emptyFields.push({ id: 'calendar-container', label: 'Date Selection', type: 'calendar', validationMessage: 'Please select at least 2 dates' });
+                }
+
+                // Check if time slots are selected for each date
+                if (reservationType && selectedDate) {
+                    const dateGroups = document.querySelectorAll('.date-group');
+                    let missingTimes = false;
+                    
+                    dateGroups.forEach(group => {
+                        const timeFrom = group.querySelector('select[name*="time_from"]');
+                        const timeTo = group.querySelector('select[name*="time_to"]');
+                        
+                        if (timeFrom && timeTo) {
+                            if (!timeFrom.value || !timeTo.value) {
+                                missingTimes = true;
+                            } else if (timeFrom.value >= timeTo.value) {
+                                missingTimes = true;
+                            }
+                        }
+                    });
+                    
+                    if (missingTimes) {
+                        emptyFields.push({ id: 'date-time-container', label: 'Time Selection', type: 'custom', validationMessage: 'Please select valid start and end times for all dates' });
+                    }
+                }
+            }
+
+            // Check equipment selection if needed
+            const needEquipment = document.querySelector('input[name="need_equipment"]:checked')?.value;
+            if (needEquipment === 'yes') {
+                const equipmentRows = document.querySelectorAll('.equipment-row');
+                if (equipmentRows.length === 0) {
+                    emptyFields.push({ id: 'equipment-container', label: 'Equipment Selection', type: 'custom', validationMessage: 'Please add at least one equipment item' });
+                }
+            }
+
+            // Check personal equipment details if needed
+            const personalEquipment = document.querySelector('input[name="personal_equipment"]:checked')?.value;
+            if (personalEquipment === 'yes') {
+                const personalEquipmentDetails = document.getElementById('personal_equipment_details').value;
+                if (!personalEquipmentDetails.trim()) {
+                    emptyFields.push({ id: 'personal_equipment_details', label: 'Personal Equipment Details', type: 'text', validationMessage: 'Please describe your personal equipment' });
+                }
+            }
+
+            return {
+                isValid: emptyFields.length === 0,
+                emptyFields: emptyFields
+            };
+        }
+
+        function highlightEmptyFields(emptyFields) {
+            // Clear previous highlights
+            clearFieldHighlights();
+
+            // Only highlight the first field to avoid overwhelming the user
+            const firstField = emptyFields[0];
+            if (!firstField) return;
+
+            if (firstField.type === 'radio') {
+                const radioButtons = document.querySelectorAll(`input[name="${firstField.id}"]`);
+                const container = radioButtons[0]?.closest('.flex');
+                if (container) {
+                    container.style.borderLeft = '4px solid #ef4444';
+                    container.style.paddingLeft = '12px';
+                    container.style.backgroundColor = '#fef2f2';
+                    container.style.borderRadius = '4px';
+                }
+            } else if (firstField.type === 'calendar') {
+                const calendarContainer = document.getElementById('calendar-container');
+                if (calendarContainer) {
+                    calendarContainer.style.borderLeft = '4px solid #ef4444';
+                    calendarContainer.style.paddingLeft = '12px';
+                    calendarContainer.style.backgroundColor = '#fef2f2';
+                    calendarContainer.style.borderRadius = '4px';
+                }
+            } else {
+                const element = document.getElementById(firstField.id);
+                if (element) {
+                    element.style.borderColor = '#ef4444';
+                    element.style.borderWidth = '2px';
+                    element.style.backgroundColor = '#fef2f2';
+                    element.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                }
+            }
+        }
+
+        function clearFieldHighlights() {
+            // Remove all custom validation styles
+            document.querySelectorAll('input, select, textarea').forEach(element => {
+                element.style.borderColor = '';
+                element.style.borderWidth = '';
+                element.style.backgroundColor = '';
+                element.style.boxShadow = '';
             });
             
-            console.log('Made all form pages accessible for submission');
+            // Clear container highlights
+            document.querySelectorAll('.flex').forEach(container => {
+                container.style.borderLeft = '';
+                container.style.paddingLeft = '';
+                container.style.backgroundColor = '';
+                container.style.borderRadius = '';
+            });
+            
+            const calendarContainer = document.getElementById('calendar-container');
+            if (calendarContainer) {
+                calendarContainer.style.borderLeft = '';
+                calendarContainer.style.paddingLeft = '';
+                calendarContainer.style.backgroundColor = '';
+                calendarContainer.style.borderRadius = '';
+            }
         }
+
+        function showMinimalValidationFeedback(firstEmptyField) {
+            if (!firstEmptyField) return;
+
+            // Remove any existing feedback
+            const existingFeedback = document.querySelector('.field-feedback');
+            if (existingFeedback) {
+                existingFeedback.remove();
+            }
+
+            // Create a small, non-intrusive feedback near the field
+            let targetElement;
+            if (firstEmptyField.type === 'radio') {
+                targetElement = document.querySelector(`input[name="${firstEmptyField.id}"]`)?.closest('.flex');
+            } else if (firstEmptyField.type === 'calendar') {
+                targetElement = document.getElementById('calendar-container');
+            } else {
+                targetElement = document.getElementById(firstEmptyField.id);
+            }
+
+            if (targetElement) {
+                const feedback = document.createElement('div');
+                feedback.className = 'field-feedback';
+                feedback.style.cssText = `
+                    position: absolute;
+                    background: #ef4444;
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    z-index: 1000;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    max-width: 280px;
+                    word-wrap: break-word;
+                    pointer-events: none;
+                `;
+                feedback.textContent = firstEmptyField.validationMessage || `${firstEmptyField.label} is required`;
+
+                // Position the feedback right below the input field
+                const rect = targetElement.getBoundingClientRect();
+                feedback.style.left = (rect.left + window.scrollX) + 'px';
+                feedback.style.top = (rect.bottom + window.scrollY + 10) + 'px';
+
+                // For the name field at the top, adjust positioning if needed
+                if (firstEmptyField.id === 'name') {
+                    // Ensure it's visible after scrolling to top
+                    setTimeout(() => {
+                        const updatedRect = targetElement.getBoundingClientRect();
+                        feedback.style.left = (updatedRect.left + window.scrollX) + 'px';
+                        feedback.style.top = (updatedRect.bottom + window.scrollY + 10) + 'px';
+                    }, 700); // Wait for scroll to complete
+                }
+
+                document.body.appendChild(feedback);
+
+                // Auto-remove after 5 seconds or when user starts interacting
+                const removeTimeout = setTimeout(() => {
+                    if (feedback && feedback.parentElement) {
+                        feedback.remove();
+                    }
+                }, 5000);
+
+                // Remove when user starts typing in the field
+                const removeOnInteraction = () => {
+                    clearTimeout(removeTimeout);
+                    if (feedback && feedback.parentElement) {
+                        feedback.remove();
+                    }
+                };
+
+                if (firstEmptyField.type === 'radio') {
+                    document.querySelectorAll(`input[name="${firstEmptyField.id}"]`).forEach(radio => {
+                        radio.addEventListener('change', removeOnInteraction, { once: true });
+                    });
+                } else if (targetElement) {
+                    targetElement.addEventListener('input', removeOnInteraction, { once: true });
+                    targetElement.addEventListener('focus', removeOnInteraction, { once: true });
+                }
+            }
+        }
+
+        function scrollToFirstEmptyField(firstEmptyField) {
+            if (!firstEmptyField) return;
+
+            let targetElement;
+            
+            if (firstEmptyField.type === 'radio') {
+                targetElement = document.querySelector(`input[name="${firstEmptyField.id}"]`);
+            } else if (firstEmptyField.type === 'calendar') {
+                targetElement = document.getElementById('calendar-container');
+            } else {
+                targetElement = document.getElementById(firstEmptyField.id);
+            }
+
+            if (targetElement) {
+                // For the first field (reservation type), scroll to the very top of the form
+                if (firstEmptyField.id === 'reservation_type') {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    // For other fields, scroll with offset
+                    const elementTop = targetElement.getBoundingClientRect().top + window.scrollY;
+                    const offset = 100; // Space from top
+                    
+                    window.scrollTo({
+                        top: elementTop - offset,
+                        behavior: 'smooth'
+                    });
+                }
+
+                // Focus the element after scroll completes
+                setTimeout(() => {
+                    if (firstEmptyField.type === 'radio') {
+                        const firstRadio = document.querySelector(`input[name="${firstEmptyField.id}"]`);
+                        if (firstRadio) {
+                            firstRadio.focus();
+                        }
+                    } else if (firstEmptyField.type !== 'calendar') {
+                        targetElement.focus();
+                        // Select text for input fields to make it easy to start typing
+                        if (targetElement.select && targetElement.type !== 'file') {
+                            targetElement.select();
+                        }
+                    }
+                }, 600); // Wait for scroll animation to complete
+            }
+        }
+
+        function showValidationMessage(emptyFields) {
+            // Remove existing validation messages
+            const existingMessage = document.getElementById('validation-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            // Create and show new validation message
+            const message = document.createElement('div');
+            message.id = 'validation-message';
+            message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md';
+            
+            const fieldsList = emptyFields.map(field => `• ${field.validationMessage || field.label}`).join('\n');
+            message.innerHTML = `
+                <div class="font-bold">⚠️ Please complete these required fields:</div>
+                <div class="mt-2 text-sm whitespace-pre-line">${fieldsList}</div>
+                <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-white hover:text-gray-200 text-lg leading-none">✕</button>
+            `;
+
+            document.body.appendChild(message);
+
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (message && message.parentElement) {
+                    message.remove();
+                }
+            }, 10000);
+        }
+
+
 
         function addHiddenFields() {
             const form = document.getElementById('reservation-form');
@@ -712,36 +1198,51 @@
             const existingHidden = form.querySelectorAll('input[type="hidden"][data-dynamic="true"]');
             existingHidden.forEach(field => field.remove());
 
+            console.log('Adding hidden fields for reservation type:', reservationType);
+
             // Add dates data
             const dateGroups = document.querySelectorAll('.date-time-group');
+            console.log('Date groups found:', dateGroups.length);
+            
             dateGroups.forEach((group, index) => {
                 const date = group.dataset.date;
-                const timeFrom = group.querySelector('.time-from').value;
-                const timeTo = group.querySelector('.time-to').value;
+                const timeFromElement = group.querySelector('.time-from');
+                const timeToElement = group.querySelector('.time-to');
+                
+                if (timeFromElement && timeToElement) {
+                    const timeFrom = timeFromElement.value;
+                    const timeTo = timeToElement.value;
 
-                addHiddenField(`dates[${index}][date]`, date);
-                addHiddenField(`dates[${index}][time_from]`, timeFrom);
-                addHiddenField(`dates[${index}][time_to]`, timeTo);
+                    console.log(`Date ${index}: ${date}, ${timeFrom} - ${timeTo}`);
+
+                    addHiddenField(`dates[${index}][date]`, date);
+                    addHiddenField(`dates[${index}][time_from]`, timeFrom);
+                    addHiddenField(`dates[${index}][time_to]`, timeTo);
+                } else {
+                    console.error(`Missing time elements for date group ${index}`);
+                }
             });
 
             // Add days_count for consecutive reservations
             if (reservationType === 'consecutive') {
                 const daysCount = document.getElementById('days-count').value;
+                console.log('Adding days_count:', daysCount);
                 addHiddenField('days_count', daysCount);
             }
 
             // Add equipment data if needed
-            if (document.querySelector('input[name="need_equipment"]:checked').value === 'yes') {
+            const needEquipmentChecked = document.querySelector('input[name="need_equipment"]:checked');
+            if (needEquipmentChecked && needEquipmentChecked.value === 'yes') {
                 const equipmentGroups = document.querySelectorAll('.equipment-date-group');
                 let equipmentIndex = 0;
 
-                console.log('Equipment groups found:', equipmentGroups.length); // Debug
+                console.log('Equipment groups found:', equipmentGroups.length);
 
                 equipmentGroups.forEach(group => {
                     const groupDate = group.dataset.date;
                     const rows = group.querySelectorAll('.equipment-row');
                     
-                    console.log(`Processing date ${groupDate} with ${rows.length} rows`); // Debug
+                    console.log(`Processing date ${groupDate} with ${rows.length} rows`);
 
                     rows.forEach(row => {
                         const select = row.querySelector('.equipment-select');
@@ -752,7 +1253,7 @@
                             const quantity = parseInt(unitsInput.value);
                             
                             if (quantity > 0) {
-                                console.log(`Adding equipment: ID=${equipmentId}, Qty=${quantity}, Date=${groupDate}`); // Debug
+                                console.log(`Adding equipment: ID=${equipmentId}, Qty=${quantity}, Date=${groupDate}`);
                                 
                                 addHiddenField(`equipment[${equipmentIndex}][equipment_id]`, equipmentId);
                                 addHiddenField(`equipment[${equipmentIndex}][quantity]`, quantity);
@@ -763,8 +1264,10 @@
                     });
                 });
 
-                console.log('Total equipment items added:', equipmentIndex); // Debug
+                console.log('Total equipment items added:', equipmentIndex);
             }
+            
+            console.log('Finished adding hidden fields');
         }
 
         function addHiddenField(name, value) {
@@ -775,6 +1278,77 @@
             hiddenField.value = value;
             hiddenField.setAttribute('data-dynamic', 'true');
             form.appendChild(hiddenField);
+        }
+
+        function setupRealTimeValidation() {
+            // Add event listeners to clear validation errors when users interact with fields
+            const textInputs = ['name', 'email', 'organization', 'purpose', 'other_details', 'personal_equipment_details'];
+            
+            textInputs.forEach(fieldId => {
+                const element = document.getElementById(fieldId);
+                if (element) {
+                    element.addEventListener('input', function() {
+                        clearFieldError(this);
+                    });
+                    element.addEventListener('focus', function() {
+                        clearFieldError(this);
+                    });
+                }
+            });
+
+            // Handle select elements
+            const selects = ['facility-select', 'days-count'];
+            selects.forEach(fieldId => {
+                const element = document.getElementById(fieldId);
+                if (element) {
+                    element.addEventListener('change', function() {
+                        clearFieldError(this);
+                    });
+                }
+            });
+
+            // Handle radio button groups
+            const radioGroups = ['reservation_type', 'need_equipment', 'personal_equipment'];
+            radioGroups.forEach(groupName => {
+                const radioButtons = document.querySelectorAll(`input[name="${groupName}"]`);
+                radioButtons.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        clearRadioGroupError(groupName);
+                    });
+                });
+            });
+
+            // Handle calendar interactions
+            document.getElementById('calendar-container').addEventListener('click', function() {
+                clearFieldError(this);
+            });
+        }
+
+        function clearFieldError(element) {
+            element.classList.remove('validation-error');
+            element.style.borderColor = '';
+            element.style.backgroundColor = '';
+            
+            // Remove validation message if all errors are cleared
+            setTimeout(() => {
+                const remainingErrors = document.querySelectorAll('.validation-error');
+                if (remainingErrors.length === 0) {
+                    const validationMessage = document.getElementById('validation-message');
+                    if (validationMessage) {
+                        validationMessage.remove();
+                    }
+                }
+            }, 100);
+        }
+
+        function clearRadioGroupError(groupName) {
+            const radioButtons = document.querySelectorAll(`input[name="${groupName}"]`);
+            radioButtons.forEach(radio => {
+                const container = radio.closest('.flex, .inline-flex');
+                if (container) {
+                    container.classList.remove('validation-error');
+                }
+            });
         }
 
         // All pages are now visible by default - no navigation needed
