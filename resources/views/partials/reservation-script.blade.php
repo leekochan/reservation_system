@@ -1353,4 +1353,5 @@
 
         // All pages are now visible by default - no navigation needed
     });
+    //for changes in github
 </script>
