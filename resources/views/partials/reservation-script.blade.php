@@ -581,13 +581,20 @@
         }
 
         // Sample equipment data (in real app, this would come from backend)
-        const equipmentOptions = @json($equipments->map(function($equipment) {
-            return [
-                'id' => $equipment->equipment_id,
-                'name' => $equipment->equipment_name,
-                'units' => $equipment->units
-            ];
-        }));
+        const equipmentOptions = [
+            @if(isset($equipments) && $equipments->count() > 0)
+                @foreach($equipments as $equipment)
+                {
+                    id: {{ $equipment->equipment_id ?? 0 }},
+                    name: '{{ addslashes($equipment->equipment_name ?? "Unknown Equipment") }}',
+                    units: {{ $equipment->units ?? 0 }},
+                    hourly_rate: {{ optional($equipment->details)->equipment_per_hour_rate ?? 0 }},
+                    package1_rate: {{ optional($equipment->details)->equipment_package_rate1 ?? 0 }},
+                    package2_rate: {{ optional($equipment->details)->equipment_package_rate2 ?? 0 }}
+                }@if(!$loop->last),@endif
+                @endforeach
+            @endif
+        ];
 
         // Handle equipment radio button changes
         equipmentRadios.forEach(radio => {
@@ -658,7 +665,7 @@
                                 <select class="equipment-select w-full px-3 py-2" onchange="updateUnitsAvailable(this)">
                                     <option value="">Select Equipment</option>
                                     ${equipmentOptions.map(opt =>
-                            `<option value="${opt.id}" data-units="${opt.units}">${opt.name}</option>`
+                            `<option value="${opt.id}" data-units="${opt.units}" data-hourly="${opt.hourly_rate || 0}" data-package1="${opt.package1_rate || 0}" data-package2="${opt.package2_rate || 0}">${opt.name}</option>`
                         ).join('')}
                                 </select>
                             </div>
@@ -695,7 +702,7 @@
                             <select class="equipment-select w-full px-3 py-2" onchange="updateUnitsAvailable(this)">
                                 <option value="">Select Equipment</option>
                                 ${equipmentOptions.map(opt =>
-                                `<option value="${opt.id}" data-units="${opt.units}">${opt.name}</option>`
+                                `<option value="${opt.id}" data-units="${opt.units}" data-hourly="${opt.hourly_rate}" data-package1="${opt.package1_rate}" data-package2="${opt.package2_rate}">${opt.name}</option>`
                             ).join('')}
                             </select>
                         </div>
@@ -808,33 +815,9 @@
             // Add hidden form fields for dynamic data
             addHiddenFields();
             
-            // Show confirmation
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const organization = document.getElementById('organization').value;
-            const facilityName = document.getElementById('facility-select').selectedOptions[0]?.text || 'Selected facility';
-            const purpose = document.getElementById('purpose').value;
-            
-            const confirmation = confirm(`🎯 Ready to submit your reservation?\n\n👤 Name: ${name}\n📧 Email: ${email}\n🏢 Organization: ${organization}\n🏫 Facility: ${facilityName}\n📝 Purpose: ${purpose}\n\nClick OK to submit or Cancel to review.`);
-            
-            if (confirmation) {
-                console.log('✅ User confirmed submission');
-                
-                // Submit form directly without preventDefault interference
-                const form = document.getElementById('reservation-form');
-                console.log('🚀 Submitting form to:', form.action);
-                console.log('Form method:', form.method);
-                console.log('Form data being submitted:', new FormData(form));
-                
-                // Disable the submit button to prevent double submission
-                document.getElementById('final-submit-btn').disabled = true;
-                document.getElementById('final-submit-btn').innerHTML = '⏳ Submitting...';
-                
-                // Submit the form
-                form.submit();
-            } else {
-                console.log('❌ User cancelled submission');
-            }
+            // Calculate prices and show enhanced confirmation
+            const priceEstimation = calculatePriceEstimation();
+            showEnhancedConfirmation(priceEstimation);
         });
 
         function validateAllRequiredFields() {
@@ -1352,6 +1335,576 @@
         }
 
         // All pages are now visible by default - no navigation needed
+
+        // Price calculation functions
+        function calculatePriceEstimation() {
+            const facilitySelect = document.getElementById('facility-select');
+            const selectedFacilityId = facilitySelect.value;
+            const facilityName = facilitySelect.selectedOptions[0]?.text || 'Selected facility';
+            
+            // Calculate daily breakdown for each reservation day
+            const dailyBreakdown = calculateDailyBreakdown();
+            
+            // Calculate totals
+            let totalHours = 0;
+            let totalFacilityAmount = 0;
+            let totalEquipmentAmount = 0;
+            
+            dailyBreakdown.forEach(day => {
+                totalHours += day.hours;
+                totalFacilityAmount += day.facility.amount;
+                totalEquipmentAmount += day.equipment.amount;
+            });
+            
+            const totalPrice = totalFacilityAmount + totalEquipmentAmount;
+            
+            return {
+                facilityName,
+                totalHours,
+                dailyBreakdown,
+                facility: {
+                    amount: totalFacilityAmount,
+                    breakdown: `Total facility cost across ${dailyBreakdown.length} day(s)`
+                },
+                equipment: {
+                    amount: totalEquipmentAmount,
+                    breakdown: `Total equipment cost across ${dailyBreakdown.length} day(s)`
+                },
+                total: totalPrice
+            };
+        }
+        
+        function calculateDailyBreakdown() {
+            const dailyData = [];
+            
+            // Get all date-time groups
+            const dateTimeGroups = document.querySelectorAll('.date-time-group');
+            
+            dateTimeGroups.forEach((group, index) => {
+                const dateLabel = group.querySelector('.start-date')?.value || group.dataset.date;
+                const timeFromSelect = group.querySelector('.time-from');
+                const timeToSelect = group.querySelector('.time-to');
+                
+                if (timeFromSelect && timeToSelect && timeFromSelect.value && timeToSelect.value) {
+                    const timeFrom = timeFromSelect.value;
+                    const timeTo = timeToSelect.value;
+                    
+                    // Calculate hours for this day
+                    const dayHours = calculateHoursForTimeSlot(timeFrom, timeTo);
+                    
+                    // Calculate facility price for this day
+                    const facilityPrice = calculateFacilityPriceForDay(dayHours);
+                    
+                    // Calculate equipment price for this day
+                    const equipmentPrice = calculateEquipmentPriceForDay(group.dataset.date, dayHours);
+                    
+                    dailyData.push({
+                        date: dateLabel,
+                        formattedDate: formatDateForDisplay(new Date(group.dataset.date)),
+                        timeFrom,
+                        timeTo,
+                        hours: dayHours,
+                        facility: facilityPrice,
+                        equipment: equipmentPrice,
+                        dailyTotal: facilityPrice.amount + equipmentPrice.amount
+                    });
+                }
+            });
+            
+            return dailyData;
+        }
+        
+        function calculateHoursForTimeSlot(timeFrom, timeTo) {
+            // Parse times
+            const [fromHour, fromMin] = timeFrom.split(':').map(Number);
+            const [toHour, toMin] = timeTo.split(':').map(Number);
+            
+            let fromMinutes = fromHour * 60 + fromMin;
+            let toMinutes = toHour * 60 + toMin;
+            
+            // Handle overnight reservations
+            if (toMinutes < fromMinutes) {
+                toMinutes += 24 * 60; // Add 24 hours
+            }
+            
+            // Handle same time (minimum 1 hour)
+            if (toMinutes === fromMinutes) {
+                return 1;
+            } else {
+                const durationMinutes = toMinutes - fromMinutes;
+                return durationMinutes / 60;
+            }
+        }
+        
+        function calculateTotalHours() {
+            let totalHours = 0;
+            
+            // Get all date-time groups
+            const dateTimeGroups = document.querySelectorAll('.date-time-group');
+            
+            dateTimeGroups.forEach(group => {
+                const timeFromSelect = group.querySelector('.time-from');
+                const timeToSelect = group.querySelector('.time-to');
+                
+                if (timeFromSelect && timeToSelect && timeFromSelect.value && timeToSelect.value) {
+                    const timeFrom = timeFromSelect.value;
+                    const timeTo = timeToSelect.value;
+                    
+                    totalHours += calculateHoursForTimeSlot(timeFrom, timeTo);
+                }
+            });
+            
+            return totalHours;
+        }
+        
+        function calculateFacilityPrice(facilityId, totalHours) {
+            const facilitySelect = document.getElementById('facility-select');
+            const selectedOption = facilitySelect.options[facilitySelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                return { amount: 0, breakdown: 'No facility selected' };
+            }
+            
+            const facility = {
+                hourly_rate: parseFloat(selectedOption.dataset.hourly) || 0,
+                package1_rate: parseFloat(selectedOption.dataset.package1) || 0,
+                package2_rate: parseFloat(selectedOption.dataset.package2) || 0
+            };
+            
+            let amount = 0;
+            let breakdown = '';
+            
+            // Package 1: More than 8 hours (whole day)
+            if (totalHours > 8 && facility.package1_rate > 0) {
+                amount = facility.package1_rate;
+                breakdown = `Package 1 (Whole Day): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Package 2: More than 4 hours but less than or equal to 8 hours (half day)
+            else if (totalHours > 4 && totalHours <= 8 && facility.package2_rate > 0) {
+                amount = facility.package2_rate;
+                breakdown = `Package 2 (Half Day): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Hourly rate: Less than or equal to 4 hours OR fallback when packages not available
+            else if (facility.hourly_rate > 0) {
+                amount = facility.hourly_rate * totalHours;
+                breakdown = `Hourly Rate: ₱${facility.hourly_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${totalHours.toFixed(1)} hrs = ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Fallback to packages if no hourly rate
+            else if (facility.package2_rate > 0) {
+                amount = facility.package2_rate;
+                breakdown = `Package 2 (Fallback): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            else if (facility.package1_rate > 0) {
+                amount = facility.package1_rate;
+                breakdown = `Package 1 (Fallback): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            
+            return { amount, breakdown };
+        }
+        
+        function calculateFacilityPriceForDay(dayHours) {
+            const facilitySelect = document.getElementById('facility-select');
+            const selectedOption = facilitySelect.options[facilitySelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                return { amount: 0, breakdown: 'No facility selected' };
+            }
+            
+            const facility = {
+                hourly_rate: parseFloat(selectedOption.dataset.hourly) || 0,
+                package1_rate: parseFloat(selectedOption.dataset.package1) || 0,
+                package2_rate: parseFloat(selectedOption.dataset.package2) || 0
+            };
+            
+            let amount = 0;
+            let breakdown = '';
+            
+            // Package 1: More than 8 hours (whole day)
+            if (dayHours > 8 && facility.package1_rate > 0) {
+                amount = facility.package1_rate;
+                breakdown = `Package 1 (Whole Day): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Package 2: More than 4 hours but less than or equal to 8 hours (half day)
+            else if (dayHours > 4 && dayHours <= 8 && facility.package2_rate > 0) {
+                amount = facility.package2_rate;
+                breakdown = `Package 2 (Half Day): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Hourly rate: Less than or equal to 4 hours OR fallback when packages not available
+            else if (facility.hourly_rate > 0) {
+                amount = facility.hourly_rate * dayHours;
+                breakdown = `Hourly Rate: ₱${facility.hourly_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${dayHours.toFixed(1)} hrs = ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            // Fallback to packages if no hourly rate
+            else if (facility.package2_rate > 0) {
+                amount = facility.package2_rate;
+                breakdown = `Package 2 (Fallback): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            else if (facility.package1_rate > 0) {
+                amount = facility.package1_rate;
+                breakdown = `Package 1 (Fallback): ₱${amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+            }
+            
+            return { amount, breakdown };
+        }
+        
+        function calculateEquipmentPriceForDay(targetDate, dayHours) {
+            let totalAmount = 0;
+            const breakdown = [];
+            
+            // Check if equipment is needed
+            const needEquipmentChecked = document.querySelector('input[name="need_equipment"]:checked');
+            if (!needEquipmentChecked || needEquipmentChecked.value !== 'yes') {
+                return { amount: 0, breakdown: 'No equipment requested' };
+            }
+            
+            // Find equipment group for this specific date
+            const equipmentDateGroup = document.querySelector(`.equipment-date-group[data-date="${targetDate}"]`);
+            if (!equipmentDateGroup) {
+                return { amount: 0, breakdown: 'No equipment for this date' };
+            }
+            
+            // Get equipment selections for this date
+            const equipmentRows = equipmentDateGroup.querySelectorAll('.equipment-row');
+            
+            equipmentRows.forEach(row => {
+                const select = row.querySelector('.equipment-select');
+                const unitsInput = row.querySelector('.units-input');
+                
+                if (select && unitsInput && select.value && unitsInput.value) {
+                    const selectedOption = select.options[select.selectedIndex];
+                    const quantity = parseInt(unitsInput.value);
+                    
+                    if (quantity > 0 && selectedOption) {
+                        const equipment = {
+                            name: selectedOption.text,
+                            hourly_rate: parseFloat(selectedOption.dataset.hourly) || 0,
+                            package1_rate: parseFloat(selectedOption.dataset.package1) || 0,
+                            package2_rate: parseFloat(selectedOption.dataset.package2) || 0
+                        };
+                        
+                        let itemAmount = 0;
+                        let itemBreakdown = '';
+                        
+                        // Package 1: More than 8 hours (whole day)
+                        if (dayHours > 8 && equipment.package1_rate > 0) {
+                            itemAmount = equipment.package1_rate * quantity;
+                            itemBreakdown = `${equipment.name} (Package 1 - Fallback): ₱${equipment.package1_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${itemAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Package 2: More than 4 hours (half day) - Note: Equipment uses Package 1 for whole day pricing
+                        else if (dayHours > 4 && dayHours <= 8 && equipment.package1_rate > 0) {
+                            itemAmount = equipment.package1_rate * quantity;
+                            itemBreakdown = `${equipment.name} (Package 1 - Fallback): ₱${equipment.package1_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${itemAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Hourly rate: Less than or equal to 4 hours OR fallback when packages not available
+                        else if (equipment.hourly_rate > 0) {
+                            itemAmount = equipment.hourly_rate * dayHours * quantity;
+                            itemBreakdown = `${equipment.name} (Hourly): ₱${equipment.hourly_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${dayHours.toFixed(1)} hrs × ${quantity} = ₱${itemAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Fallback to packages if no hourly rate
+                        else if (equipment.package1_rate > 0) {
+                            itemAmount = equipment.package1_rate * quantity;
+                            itemBreakdown = `${equipment.name} (Package 1 - Fallback): ₱${equipment.package1_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${itemAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        
+                        if (itemAmount > 0) {
+                            totalAmount += itemAmount;
+                            breakdown.push(itemBreakdown);
+                        }
+                    }
+                }
+            });
+            
+            return { 
+                amount: totalAmount, 
+                breakdown: breakdown.length > 0 ? breakdown.join('; ') : 'No equipment selected for this date'
+            };
+        }
+        
+        function calculateEquipmentPrice(totalHours) {
+            let totalAmount = 0;
+            const breakdown = [];
+            
+            // Check if equipment is needed
+            const needEquipmentChecked = document.querySelector('input[name="need_equipment"]:checked');
+            if (!needEquipmentChecked || needEquipmentChecked.value !== 'yes') {
+                return { amount: 0, breakdown: 'No equipment requested' };
+            }
+            
+            // Get all equipment selections
+            const equipmentRows = document.querySelectorAll('.equipment-row');
+            
+            equipmentRows.forEach(row => {
+                const select = row.querySelector('.equipment-select');
+                const unitsInput = row.querySelector('.units-input');
+                
+                if (select && unitsInput && select.value && unitsInput.value) {
+                    const selectedOption = select.options[select.selectedIndex];
+                    const quantity = parseInt(unitsInput.value);
+                    
+                    if (selectedOption && quantity > 0) {
+                        const equipment = {
+                            name: selectedOption.text,
+                            hourly_rate: parseFloat(selectedOption.dataset.hourly) || 0,
+                            package1_rate: parseFloat(selectedOption.dataset.package1) || 0,
+                            package2_rate: parseFloat(selectedOption.dataset.package2) || 0
+                        };
+                        
+                        let equipmentAmount = 0;
+                        let equipmentBreakdown = '';
+                        
+                        // Package 1: More than 8 hours (whole day)
+                        if (totalHours > 8 && equipment.package1_rate > 0) {
+                            equipmentAmount = equipment.package1_rate * quantity;
+                            equipmentBreakdown = `${equipment.name} (Package 1): ₱${equipment.package1_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${equipmentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Package 2: More than 4 hours but less than or equal to 8 hours (half day)
+                        else if (totalHours > 4 && totalHours <= 8 && equipment.package2_rate > 0) {
+                            equipmentAmount = equipment.package2_rate * quantity;
+                            equipmentBreakdown = `${equipment.name} (Package 2): ₱${equipment.package2_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${equipmentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Hourly rate
+                        else if (equipment.hourly_rate > 0) {
+                            const baseAmount = equipment.hourly_rate * totalHours;
+                            equipmentAmount = baseAmount * quantity;
+                            equipmentBreakdown = `${equipment.name} (Hourly): ₱${equipment.hourly_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${totalHours.toFixed(1)} hrs × ${quantity} = ₱${equipmentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        // Fallback to packages
+                        else if (equipment.package2_rate > 0) {
+                            equipmentAmount = equipment.package2_rate * quantity;
+                            equipmentBreakdown = `${equipment.name} (Package 2 - Fallback): ₱${equipment.package2_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${equipmentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        else if (equipment.package1_rate > 0) {
+                            equipmentAmount = equipment.package1_rate * quantity;
+                            equipmentBreakdown = `${equipment.name} (Package 1 - Fallback): ₱${equipment.package1_rate.toLocaleString('en-PH', {minimumFractionDigits: 2})} × ${quantity} = ₱${equipmentAmount.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                        }
+                        
+                        if (equipmentAmount > 0) {
+                            totalAmount += equipmentAmount;
+                            breakdown.push(equipmentBreakdown);
+                        }
+                    }
+                }
+            });
+            
+            return { 
+                amount: totalAmount, 
+                breakdown: breakdown.length > 0 ? breakdown.join('<br>') : 'No equipment selected' 
+            };
+        }
+        
+        function showEnhancedConfirmation(priceEstimation) {
+            // Create modal backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            backdrop.style.backdropFilter = 'blur(4px)';
+            
+            // Get form data
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const organization = document.getElementById('organization').value;
+            const purpose = document.getElementById('purpose').value;
+            
+            // Create modal content
+            const modal = document.createElement('div');
+            modal.className = 'bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto border border-gray-200';
+            
+            modal.innerHTML = `
+                <div class="p-8">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-100">
+                        <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                            <svg class="w-8 h-8 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Confirm Your Reservation
+                        </h2>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+                    </div>
+                    
+                    <!-- Personal Information -->
+                    <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            Personal Information
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div><strong>Name:</strong> ${name}</div>
+                            <div><strong>Email:</strong> ${email}</div>
+                            <div class="md:col-span-2"><strong>Organization:</strong> ${organization}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Reservation Details -->
+                    <div class="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 class="text-lg font-semibold text-green-800 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            Reservation Details
+                        </h3>
+                        <div class="space-y-2 text-sm">
+                            <div><strong>Facility:</strong> ${priceEstimation.facilityName}</div>
+                            <div><strong>Total Hours:</strong> ${priceEstimation.totalHours.toFixed(1)} hours</div>
+                            <div><strong>Purpose:</strong> ${purpose}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Price Estimation -->
+                    <div class="mb-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
+                        <h3 class="text-lg font-semibold text-amber-800 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                            Payment Estimation
+                        </h3>
+                        
+                        ${priceEstimation.dailyBreakdown && priceEstimation.dailyBreakdown.length > 1 ? 
+                            `<!-- Daily Breakdown for Multiple Days -->
+                            <div class="space-y-4 mb-4">
+                                <h4 class="text-md font-semibold text-amber-700">📅 Daily Breakdown:</h4>
+                                ${priceEstimation.dailyBreakdown.map((day, index) => `
+                                    <div class="bg-white p-4 rounded border border-gray-200">
+                                        <!-- Date and Hours Header -->
+                                        <div class="font-medium text-gray-800 mb-3">
+                                            📅 ${day.formattedDate} (${day.timeFrom} - ${day.timeTo}) - ${day.hours.toFixed(1)} hours
+                                        </div>
+                                        
+                                        <!-- Facility Section -->
+                                        <div class="mb-3">
+                                            <!-- Facility Calculation -->
+                                            <div class="text-sm text-gray-600 mb-2">
+                                                ${day.facility.breakdown}
+                                            </div>
+                                            <!-- Facility Label and Price -->
+                                            <div class="flex justify-between items-center">
+                                                <span class="font-medium text-gray-700">🏢 Facility Fee:</span>
+                                                <span class="font-bold text-green-600">₱${day.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Equipment Section -->
+                                        <div class="mb-3">
+                                            <!-- Equipment Calculation -->
+                                            <div class="text-sm text-gray-600 mb-2">
+                                                ${day.equipment.breakdown.split('; ').map(item => `<div>${item}</div>`).join('')}
+                                            </div>
+                                            <!-- Equipment Label and Price -->
+                                            <div class="flex justify-between items-center">
+                                                <span class="font-medium text-gray-700">🔧 Equipment Fee:</span>
+                                                <span class="font-bold text-blue-600">₱${day.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Day Total -->
+                                        <div class="border-t pt-3 mt-3">
+                                            <div class="flex justify-between items-center font-semibold">
+                                                <span class="text-amber-800">Day Total:</span>
+                                                <span class="text-lg text-amber-700">₱${day.dailyTotal.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <!-- Overall Summary -->
+                            <div class="bg-amber-100 p-3 rounded border-2 border-amber-300">
+                                <h4 class="text-md font-semibold text-amber-800 mb-2">📊 Overall Summary:</h4>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="font-medium text-gray-700">🏢 Total Facility Fee:</span>
+                                        <span class="font-bold text-green-600">₱${priceEstimation.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="font-medium text-gray-700">🔧 Total Equipment Fee:</span>
+                                        <span class="font-bold text-blue-600">₱${priceEstimation.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div class="border-t border-amber-400 pt-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-lg font-bold text-amber-800">💳 Grand Total:</span>
+                                            <span class="text-xl font-bold text-amber-900">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`
+                            :
+                            `<!-- Single Day Summary -->
+                            <div class="space-y-3">
+                                <!-- Facility Fee -->
+                                <div class="bg-white p-3 rounded border">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-medium text-gray-700">🏢 Facility Fee:</span>
+                                        <span class="font-bold text-green-600">₱${priceEstimation.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">${priceEstimation.facility.breakdown}</div>
+                                </div>
+                                
+                                <!-- Equipment Fee -->
+                                <div class="bg-white p-3 rounded border">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-medium text-gray-700">🔧 Equipment Fee:</span>
+                                        <span class="font-bold text-blue-600">₱${priceEstimation.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">${priceEstimation.equipment.breakdown}</div>
+                                </div>
+                                
+                                <!-- Total -->
+                                <div class="border-t border-amber-300 pt-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-lg font-bold text-amber-800">💳 Total Estimated Payment:</span>
+                                        <span class="text-xl font-bold text-amber-900">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                </div>
+                            </div>`
+                        }
+                        
+                        <div class="mt-3 text-xs text-amber-700 bg-amber-100 p-2 rounded">
+                            <strong>Note:</strong> This is an estimated amount. Final payment may vary based on additional charges or adjustments.
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-4 justify-end">
+                        <button onclick="this.closest('.fixed').remove()" 
+                                class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all duration-200 shadow-md hover:shadow-lg flex items-center font-semibold">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            Cancel & Review
+                        </button>
+                        <button onclick="confirmSubmission()" 
+                                class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg flex items-center font-semibold">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Confirm & Submit
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            
+            // Add confirmation function to window for button access
+            window.confirmSubmission = function() {
+                console.log('✅ User confirmed submission');
+                backdrop.remove();
+                
+                // Submit form directly without preventDefault interference
+                const form = document.getElementById('reservation-form');
+                console.log('🚀 Submitting form to:', form.action);
+                console.log('Form method:', form.method);
+                console.log('Form data being submitted:', new FormData(form));
+                
+                // Disable the submit button to prevent double submission
+                document.getElementById('final-submit-btn').disabled = true;
+                document.getElementById('final-submit-btn').innerHTML = '⏳ Submitting...';
+                
+                // Submit the form
+                form.submit();
+            };
+        }
     });
-    //for changes in github
 </script>
