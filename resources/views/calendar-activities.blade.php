@@ -119,8 +119,8 @@
             @endphp
 
             @if($sortedReservations->count() > 0)
-                <div class="grid border-t border-b border-black" style="grid-template-columns: 80px repeat({{ $columnCount }}, 1fr);">
-                    <div class="flex items-center justify-center flex-col">
+                <div class="flex gap-2">
+                    <div class="flex items-center justify-center flex-col w-20 flex-shrink-0 border-t border-l border-r border-b border-black">
                         <div class="text-center font-bold text-sm">{{ $dateObj->format('D') }}</div>
                         <div class="text-[#7B172E] font-extrabold text-2xl">{{ $dateObj->format('d') }}</div>
                     </div>
@@ -131,13 +131,16 @@
 
                             // Check if this is an admin block or regular reservation
                             if (isset($reservation->is_admin_block) && $reservation->is_admin_block) {
-                                $colorClass = 'bg-red-600'; // Special color for admin blocks
+                                $colorClass = 'bg-red-600 text-white'; // Special color for admin blocks
                                 $startTime = $reservation->formatted_times['start_time'];
                                 $endTime = $reservation->formatted_times['end_time'];
                                 $title = $reservation->purpose;
                                 $facilityName = $reservation->facility->facility_name ?? 'No Facility';
                                 $isAdminBlock = true;
                             } else {
+                                // White background for regular reservations
+                                $colorClass = 'bg-white text-gray-800 border-x border-black-500';
+                                
                                 // Get time information based on reservation type
                                 $startTime = 'N/A';
                                 $endTime = 'N/A';
@@ -158,45 +161,45 @@
                                 $facilityName = $reservation->facility->facility_name ?? 'No Facility';
                             }
                         @endphp
-                        <div class="{{ $colorClass }} text-white p-4 border-l border-black" style="min-width: 0;">
-                            <div class="font-bold text-md mb-1 flex items-center justify-between">
-                                <span>{{ $title }}</span>
-                                @if($isAdminBlock)
-                                    <span class="text-xs bg-white text-red-600 px-2 py-1 rounded">ADMIN BLOCK</span>
-                                @endif
-                            </div>
-                            <div class="text-md">
-                                <strong></strong> {{ $facilityName }}
-                            </div>
-                            <div class="text-md">
-                                <strong></strong> {{ $dateKey }}
-                            </div>
-                            <div class="text-md">
-                                <strong></strong>
-                                @if($isAdminBlock)
-                                    {{ $startTime }} - {{ $endTime }}
-                                @elseif($startTime !== 'N/A' && $endTime !== 'N/A')
-                                    {{ Carbon::parse($startTime)->format('g:i A') }} -
-                                    {{ Carbon::parse($endTime)->format('g:i A') }}
-                                @else
-                                    N/A
-                                @endif
-                            </div>
-                            @if($isAdminBlock && $reservation->notes)
-                                <div class="text-sm mt-1 italic">
-                                    {{ $reservation->notes }}
+                        <div class="{{ $colorClass }} p-4 border-t border-l border-r border-b border-black flex-shrink-0 flex flex-col justify-center" style="min-width: 200px; width: auto;">
+                            @if($isAdminBlock)
+                                <div class="font-bold text-md mb-1 flex items-center justify-start">
+                                    <span class="text-xs bg-white text-red-600 px-2 py-1 rounded flex-shrink-0">ADMIN BLOCK</span>
                                 </div>
                             @endif
+                            <div class="text-sm mb-1 flex items-center">
+                                <strong class="{{ $isAdminBlock ? 'text-white' : 'text-gray-600' }} flex-shrink-0 mr-1">Purpose:</strong> 
+                                <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">{{ $title }}</span>
+                            </div>
+                            <div class="text-sm mb-1 flex items-center">
+                                <strong class="{{ $isAdminBlock ? 'text-white' : 'text-gray-600' }} flex-shrink-0 mr-1">Facility:</strong> 
+                                <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">{{ $facilityName }}</span>
+                            </div>
+                            <div class="text-sm mb-1 flex items-center">
+                                <strong class="{{ $isAdminBlock ? 'text-white' : 'text-gray-600' }} flex-shrink-0 mr-1">Date:</strong> 
+                                <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">{{ $dateKey }}</span>
+                            </div>
+                            <div class="text-sm mb-1 flex items-center">
+                                <strong class="{{ $isAdminBlock ? 'text-white' : 'text-gray-600' }} flex-shrink-0 mr-1">Time:</strong>
+                                @if($isAdminBlock)
+                                    <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">{{ $startTime }} - {{ $endTime }}</span>
+                                @elseif($startTime !== 'N/A' && $endTime !== 'N/A')
+                                    <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">{{ Carbon::parse($startTime)->format('g:i A') }} -
+                                    {{ Carbon::parse($endTime)->format('g:i A') }}</span>
+                                @else
+                                    <span class="{{ $isAdminBlock ? 'text-white' : 'text-gray-800' }} whitespace-nowrap">N/A</span>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
             @else
-                <div class="grid border-t border-b border-black" style="grid-template-columns: 80px 1fr;">
-                    <div class="flex items-center justify-center flex-col">
+                <div class="flex">
+                    <div class="flex items-center justify-center flex-col w-20 flex-shrink-0 border-t border-l border-r border-b border-black">
                         <div class="text-center font-bold text-sm">{{ $dateObj->format('D') }}</div>
                         <div class="text-[#7B172E] font-extrabold text-2xl">{{ $dateObj->format('d') }}</div>
                     </div>
-                    <div class="bg-gray-100 text-gray-500 p-4 border-l border-black flex items-center">
+                    <div class="bg-gray-100 text-gray-500 p-4 border-t border-l border-r border-b border-black flex items-center flex-1">
                         <div class="text-sm">No reservations</div>
                     </div>
                 </div>

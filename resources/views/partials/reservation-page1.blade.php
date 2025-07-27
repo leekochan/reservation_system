@@ -37,7 +37,11 @@
                 <select id="facility-select" name="facility_id" class="w-[270px] px-3 py-2 border-2 border-gray-600 rounded-lg">
                     <option value="">Select a facility</option>
                     @foreach($facilities as $facility)
-                        <option value="{{ $facility->facility_id }}" data-name="{{ $facility->facility_name }}">
+                        <option value="{{ $facility->facility_id }}" 
+                                data-name="{{ $facility->facility_name }}"
+                                data-hourly="{{ $facility->details ? ($facility->details->facility_per_hour_rate ?? 0) : 0 }}"
+                                data-package1="{{ $facility->details ? ($facility->details->facility_package_rate1 ?? 0) : 0 }}"
+                                data-package2="{{ $facility->details ? ($facility->details->facility_package_rate2 ?? 0) : 0 }}">
                             {{ $facility->facility_name }}
                         </option>
                     @endforeach

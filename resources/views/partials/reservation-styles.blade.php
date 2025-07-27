@@ -345,4 +345,41 @@
             opacity: 1;
         }
     }
+
+    /* Success message styles */
+    .reservation-success-details h3 {
+        color: white;
+        margin-bottom: 1rem;
+    }
+    
+    .reservation-success-details h4 {
+        color: #e8f5e8;
+        margin-bottom: 0.5rem;
+    }
+    
+    .reservation-success-details p {
+        margin-bottom: 0.25rem;
+        line-height: 1.4;
+    }
+    
+    .reservation-success-details ul {
+        margin-bottom: 0.5rem;
+    }
+    
+    .reservation-success-details .bg-green-50 {
+        background-color: rgba(240, 253, 244, 0.9) !important;
+        color: #065f46 !important;
+    }
+    
+    .reservation-success-details .text-green-700 {
+        color: #047857 !important;
+    }
+    
+    .reservation-success-details .text-green-800 {
+        color: #065f46 !important;
+    }
+    
+    .reservation-success-details .border-green-200 {
+        border-color: #a7f3d0 !important;
+    }
 </style>

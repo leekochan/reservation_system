@@ -8,17 +8,35 @@
 <body class="bg-gray-50 m-0 p-0">
 @include('partials.navbar')
 
-<!-- Flash Messages -->
-@if(session('success'))
-    <div class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50" id="success-message">
-        {{ session('success') }}
+{{-- Success message removed since payment estimation is shown before submission --}}
+{{-- @if(session('success'))
+    <div class="fixed top-4 right-4 bg-white text-gray-800 px-6 py-3 rounded-lg shadow-lg z-50 max-w-3xl overflow-y-auto max-h-96 border-l-4 border-green-500" id="success-message">
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <div class="flex items-center mb-2">
+                    <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-2">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-green-700">Reservation Submitted Successfully!</h3>
+                </div>
+                <div class="text-sm text-gray-700">
+                    {!! session('success') !!}
+                </div>
+            </div>
+            <button onclick="document.getElementById('success-message').style.display = 'none'" class="ml-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
     </div>
     <script>
         setTimeout(() => {
-            document.getElementById('success-message').style.display = 'none';
-        }, 5000);
+            const successMsg = document.getElementById('success-message');
+            if (successMsg) {
+                successMsg.style.display = 'none';
+            }
+        }, 20000); // Increased timeout for detailed message
     </script>
-@endif
+@endif --}}
 
 @if(session('error'))
     <div class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50" id="error-message">

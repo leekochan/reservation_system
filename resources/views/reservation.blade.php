@@ -132,10 +132,15 @@ function filterReservations(status) {
     document.getElementById(`tab-${status}`).classList.add('active');
     document.getElementById(`tab-${status}`).classList.remove('inactive');
     
-    // Filter and display reservations
-    const filteredReservations = allReservations.filter(reservation => 
-        reservation.status === status
-    );
+    // Filter and sort reservations by creation date (oldest first)
+    const filteredReservations = allReservations
+        .filter(reservation => reservation.status === status)
+        .sort((a, b) => {
+            // Always use created_at for accurate chronological sorting
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            return dateA - dateB; // Ascending order (oldest first)
+        });
     
     displayReservations(filteredReservations);
 }
@@ -230,9 +235,10 @@ function createReservationCard(reservation) {
                 </div>
                 
                 <div class="flex justify-between items-center">
-                    <span class="text-xs text-gray-500">
-                        ${new Date(reservation.created_at).toLocaleDateString()}
-                    </span>
+                    <div class="text-xs text-gray-500">
+                        <div>${reservation.transaction_date || new Date(reservation.created_at).toLocaleDateString()}</div>
+                        <div class="text-gray-400">${getTimeAgo(reservation.created_at)}</div>
+                    </div>
                     <div class="flex gap-2">
                         <button onclick="viewDetails(${reservation.reservation_id})" 
                                 class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors">
