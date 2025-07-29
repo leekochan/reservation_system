@@ -378,7 +378,19 @@
             // Update equipment inputs if "Yes" is selected
             if (document.querySelector('input[name="need_equipment"]:checked').value === 'yes') {
                 updateEquipmentInputs();
+                // Refresh availability for existing selections after a short delay
+                setTimeout(refreshEquipmentAvailability, 100);
             }
+        }
+
+        // Function to refresh equipment availability for existing selections
+        function refreshEquipmentAvailability() {
+            const equipmentSelects = equipmentContainer.querySelectorAll('.equipment-select');
+            equipmentSelects.forEach(select => {
+                if (select.value) {
+                    updateUnitsAvailable(select);
+                }
+            });
         }
 
         // Update date inputs based on selection
@@ -726,15 +738,47 @@
         // Global functions (needed for inline event handlers)
         window.updateUnitsAvailable = function(selectElement) {
             const selectedOption = selectElement.options[selectElement.selectedIndex];
-            const unitsAvailable = selectedOption.getAttribute('data-units');
+            const equipmentId = selectedOption.value;
             const unitsInput = selectElement.closest('.equipment-row').querySelector('.units-input');
+            const dateGroup = selectElement.closest('.equipment-date-group');
+            const date = dateGroup.dataset.date;
 
-            if (selectedOption.value && unitsAvailable) {
-                unitsInput.disabled = false;
-                unitsInput.placeholder = `${unitsAvailable} units available`;
-                unitsInput.max = unitsAvailable;
-                unitsInput.min = 1;
-                unitsInput.title = `Enter a number between 1 and ${unitsAvailable}`;
+            if (selectedOption.value && date) {
+                // Fetch real-time availability from server
+                fetch(`{{ route('equipment.available-units') }}?equipment_id=${equipmentId}&date=${date}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const availableUnits = data.available_units;
+                        const totalUnits = data.total_units;
+                        
+                        unitsInput.disabled = false;
+                        unitsInput.placeholder = `${availableUnits} units available (${totalUnits} total)`;
+                        unitsInput.max = availableUnits;
+                        unitsInput.min = 1;
+                        unitsInput.title = `Enter a number between 1 and ${availableUnits}`;
+                        
+                        // Clear previous value if it exceeds available units
+                        if (unitsInput.value && parseInt(unitsInput.value) > availableUnits) {
+                            unitsInput.value = '';
+                        }
+                        
+                        // Show warning if no units available
+                        if (availableUnits === 0) {
+                            unitsInput.disabled = true;
+                            unitsInput.placeholder = 'No units available on this date';
+                            alert(`No units of ${selectedOption.text} are available on ${date}`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching equipment availability:', error);
+                        // Fallback to static data
+                        const unitsAvailable = selectedOption.getAttribute('data-units');
+                        unitsInput.disabled = false;
+                        unitsInput.placeholder = `${unitsAvailable} units available (static)`;
+                        unitsInput.max = unitsAvailable;
+                        unitsInput.min = 1;
+                        unitsInput.title = `Enter a number between 1 and ${unitsAvailable}`;
+                    });
             } else {
                 unitsInput.disabled = true;
                 unitsInput.placeholder = 'Select equipment first';
@@ -757,7 +801,11 @@
                 alert('Minimum of 1 unit required');
             } else if (value > maxUnits) {
                 inputElement.value = maxUnits;
-                alert(`Maximum available units: ${maxUnits}`);
+                if (maxUnits === 0) {
+                    alert('No units available for this equipment on the selected date');
+                } else {
+                    alert(`Maximum available units: ${maxUnits}`);
+                }
             }
         };
 
@@ -1358,17 +1406,30 @@
             
             const totalPrice = totalFacilityAmount + totalEquipmentAmount;
             
+            // Generate detailed breakdown for facility and equipment
+            let facilityBreakdown, equipmentBreakdown;
+            
+            if (dailyBreakdown.length === 1) {
+                // Single day reservation - show detailed breakdown
+                facilityBreakdown = dailyBreakdown[0].facility.breakdown;
+                equipmentBreakdown = dailyBreakdown[0].equipment.breakdown;
+            } else {
+                // Multiple days - show summary
+                facilityBreakdown = `Total facility cost across ${dailyBreakdown.length} day(s)`;
+                equipmentBreakdown = `Total equipment cost across ${dailyBreakdown.length} day(s)`;
+            }
+            
             return {
                 facilityName,
                 totalHours,
                 dailyBreakdown,
                 facility: {
                     amount: totalFacilityAmount,
-                    breakdown: `Total facility cost across ${dailyBreakdown.length} day(s)`
+                    breakdown: facilityBreakdown
                 },
                 equipment: {
                     amount: totalEquipmentAmount,
-                    breakdown: `Total equipment cost across ${dailyBreakdown.length} day(s)`
+                    breakdown: equipmentBreakdown
                 },
                 total: totalPrice
             };
@@ -1692,6 +1753,55 @@
             };
         }
         
+        function getEquipmentDetailsHtml() {
+            const needEquipmentChecked = document.querySelector('input[name="need_equipment"]:checked');
+            if (!needEquipmentChecked || needEquipmentChecked.value !== 'yes') {
+                return '<div class="text-gray-500 italic">No equipment requested</div>';
+            }
+
+            const equipmentGroups = document.querySelectorAll('.equipment-date-group');
+            if (equipmentGroups.length === 0) {
+                return '<div class="text-gray-500 italic">No equipment selected</div>';
+            }
+
+            let equipmentHtml = '';
+            const equipmentByDate = {};
+
+            // Group equipment by date
+            equipmentGroups.forEach(group => {
+                const date = group.dataset.date;
+                const formattedDate = formatDateForDisplay(new Date(date));
+                equipmentByDate[formattedDate] = [];
+
+                const rows = group.querySelectorAll('.equipment-row');
+                rows.forEach(row => {
+                    const select = row.querySelector('.equipment-select');
+                    const unitsInput = row.querySelector('.units-input');
+
+                    if (select && unitsInput && select.value && unitsInput.value) {
+                        const equipmentName = select.options[select.selectedIndex].text;
+                        const quantity = parseInt(unitsInput.value);
+                        
+                        if (quantity > 0) {
+                            equipmentByDate[formattedDate].push(`${equipmentName} (${quantity} unit${quantity > 1 ? 's' : ''})`);
+                        }
+                    }
+                });
+            });
+
+            // Generate HTML for equipment details
+            for (const [date, equipmentList] of Object.entries(equipmentByDate)) {
+                if (equipmentList.length > 0) {
+                    equipmentHtml += `<div class="mb-2"><strong>${date}:</strong></div>`;
+                    equipmentList.forEach(equipment => {
+                        equipmentHtml += `<div class="ml-4 text-gray-600">• ${equipment}</div>`;
+                    });
+                }
+            }
+
+            return equipmentHtml || '<div class="text-gray-500 italic">No equipment selected</div>';
+        }
+        
         function showEnhancedConfirmation(priceEstimation) {
             // Create modal backdrop
             const backdrop = document.createElement('div');
@@ -1748,6 +1858,19 @@
                             <div><strong>Facility:</strong> ${priceEstimation.facilityName}</div>
                             <div><strong>Total Hours:</strong> ${priceEstimation.totalHours.toFixed(1)} hours</div>
                             <div><strong>Purpose:</strong> ${purpose}</div>
+                            
+                            <!-- Equipment Details -->
+                            <div class="mt-3 pt-3 border-t border-green-300">
+                                <div class="flex items-center mb-2">
+                                    <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <strong>Equipment:</strong>
+                                </div>
+                                <div class="ml-6 space-y-1 text-xs">
+                                    ${getEquipmentDetailsHtml()}
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -1762,7 +1885,7 @@
                         
                         ${priceEstimation.dailyBreakdown && priceEstimation.dailyBreakdown.length > 1 ? 
                             `<!-- Daily Breakdown for Multiple Days -->
-                            <div class="space-y-4 mb-4">
+                            <div class="space-y-4">
                                 <h4 class="text-md font-semibold text-amber-700">📅 Daily Breakdown:</h4>
                                 ${priceEstimation.dailyBreakdown.map((day, index) => `
                                     <div class="bg-white p-4 rounded border border-gray-200">
@@ -1806,62 +1929,85 @@
                                         </div>
                                     </div>
                                 `).join('')}
-                            </div>
-                            
-                            <!-- Overall Summary -->
-                            <div class="bg-amber-100 p-3 rounded border-2 border-amber-300">
-                                <h4 class="text-md font-semibold text-amber-800 mb-2">📊 Overall Summary:</h4>
-                                <div class="space-y-2">
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-gray-700">🏢 Total Facility Fee:</span>
-                                        <span class="font-bold text-green-600">₱${priceEstimation.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="font-medium text-gray-700">🔧 Total Equipment Fee:</span>
-                                        <span class="font-bold text-blue-600">₱${priceEstimation.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
-                                    </div>
-                                    <div class="border-t border-amber-400 pt-2">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-lg font-bold text-amber-800">💳 Grand Total:</span>
-                                            <span class="text-xl font-bold text-amber-900">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>`
                             :
-                            `<!-- Single Day Summary -->
-                            <div class="space-y-3">
-                                <!-- Facility Fee -->
-                                <div class="bg-white p-3 rounded border">
+                            `<!-- Single Day Detailed Display -->
+                            <div class="space-y-4">
+                                <!-- Date and Hours Header -->
+                                <div class="font-medium text-gray-800 mb-3 flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    📅 ${priceEstimation.dailyBreakdown && priceEstimation.dailyBreakdown[0] ? 
+                                        `${priceEstimation.dailyBreakdown[0].formattedDate} (${priceEstimation.dailyBreakdown[0].timeFrom} - ${priceEstimation.dailyBreakdown[0].timeTo}) - ${priceEstimation.dailyBreakdown[0].hours.toFixed(1)} hours` : 
+                                        'Single Day Reservation'}
+                                </div>
+                                
+                                <!-- Facility Fee Section -->
+                                <div class="mb-3">
+                                    <div class="text-sm text-gray-600 mb-2">
+                                        ${priceEstimation.facility.breakdown}
+                                    </div>
                                     <div class="flex justify-between items-center">
                                         <span class="font-medium text-gray-700">🏢 Facility Fee:</span>
                                         <span class="font-bold text-green-600">₱${priceEstimation.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">${priceEstimation.facility.breakdown}</div>
                                 </div>
                                 
-                                <!-- Equipment Fee -->
-                                <div class="bg-white p-3 rounded border">
+                                <!-- Equipment Fee Section -->
+                                <div class="mb-3">
+                                    <div class="text-sm text-gray-600 mb-2">
+                                        ${priceEstimation.equipment.breakdown === 'No equipment requested' ? 
+                                            '<div class="text-gray-500 italic">No equipment requested</div>' :
+                                            priceEstimation.equipment.breakdown.split('; ').map(item => `<div>${item}</div>`).join('')
+                                        }
+                                    </div>
                                     <div class="flex justify-between items-center">
                                         <span class="font-medium text-gray-700">🔧 Equipment Fee:</span>
                                         <span class="font-bold text-blue-600">₱${priceEstimation.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
                                     </div>
-                                    <div class="text-xs text-gray-500 mt-1">${priceEstimation.equipment.breakdown}</div>
                                 </div>
                                 
-                                <!-- Total -->
-                                <div class="border-t border-amber-300 pt-3">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-lg font-bold text-amber-800">💳 Total Estimated Payment:</span>
-                                        <span class="text-xl font-bold text-amber-900">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                <!-- Day Total -->
+                                <div class="border-t pt-3 mt-3">
+                                    <div class="flex justify-between items-center font-semibold">
+                                        <span class="text-amber-800">Day Total:</span>
+                                        <span class="text-lg text-amber-700">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
                                     </div>
                                 </div>
                             </div>`
                         }
-                        
-                        <div class="mt-3 text-xs text-amber-700 bg-amber-100 p-2 rounded">
-                            <strong>Note:</strong> This is an estimated amount. Final payment may vary based on additional charges or adjustments.
+                    </div>
+                    
+                    <!-- Overall Summary -->
+                    <div class="mb-6 bg-amber-50 p-4 rounded-lg border-2 border-amber-300">
+                        <h3 class="text-lg font-semibold text-amber-800 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            📊 Overall Summary:
+                        </h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-700">🏢 Total Facility Fee:</span>
+                                <span class="font-bold text-green-600">₱${priceEstimation.facility.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-700">🔧 Total Equipment Fee:</span>
+                                <span class="font-bold text-blue-600">₱${priceEstimation.equipment.amount.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                            </div>
+                            <div class="border-t border-amber-400 pt-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-lg font-bold text-amber-800">💳 Grand Total:</span>
+                                    <span class="text-xl font-bold text-amber-900">₱${priceEstimation.total.toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    
+                    <!-- Note outside containers -->
+                    <div class="mb-6 text-xs text-amber-700 bg-amber-100 p-3 rounded border border-amber-200">
+                        <strong>Note:</strong> This is an estimated amount. Final payment may vary based on additional charges or adjustments.
                     </div>
                     
                     <!-- Action Buttons -->

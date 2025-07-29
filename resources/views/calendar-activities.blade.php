@@ -87,8 +87,67 @@
         </div>
     </div>
 
+    <!-- Filtering Section -->
+    <div class="mt-6 mb-6 bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-[#7B172E] mb-4">Filter Reservations</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <!-- Facility Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Facility</label>
+                <select id="facilityFilter" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7B172E] text-sm">
+                    <option value="">All Facilities</option>
+                    <!-- We'll populate this dynamically -->
+                </select>
+            </div>
+
+            <!-- Reservation Type Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                <select id="typeFilter" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7B172E] text-sm">
+                    <option value="">All Types</option>
+                    <option value="single">Single</option>
+                    <option value="consecutive">Consecutive</option>
+                    <option value="multiple">Multiple</option>
+                    <option value="admin_block">Admin Block</option>
+                </select>
+            </div>
+
+            <!-- Time Range Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+                <select id="timeFilter" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7B172E] text-sm">
+                    <option value="">All Times</option>
+                    <option value="morning">Morning (6:00 AM - 12:00 PM)</option>
+                    <option value="afternoon">Afternoon (12:00 PM - 6:00 PM)</option>
+                    <option value="evening">Evening (6:00 PM - 11:00 PM)</option>
+                </select>
+            </div>
+
+            <!-- Search Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Search Purpose</label>
+                <input type="text" id="searchFilter" placeholder="Search by purpose..." 
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7B172E] text-sm">
+            </div>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="flex gap-3 mt-4">
+            <button id="applyFilters" class="bg-[#7B172E] text-white px-4 py-2 rounded-md hover:bg-[#5A1221] transition-colors text-sm font-medium">
+                Apply Filters
+            </button>
+            <button id="clearFilters" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors text-sm font-medium">
+                Clear All
+            </button>
+            <div id="filterStatus" class="flex items-center text-sm text-gray-600">
+                <span id="filteredCount">Showing all reservations</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Dynamic Schedule Section -->
-    <div class="mt-6 space-y-4">
+    <div class="mt-6 space-y-4" id="scheduleSection">
         @for($day = 1; $day <= $daysInMonth; $day++)
             @php
                 $dateKey = $currentDate->copy()->day($day)->format('Y-m-d');
@@ -284,13 +343,17 @@
 </style>
 
 <script>
-    @if(isset($isAdmin) && $isAdmin)
     // Facilities data - we'll populate this from the backend
     let facilities = [];
 
     // Fetch facilities when page loads
     document.addEventListener('DOMContentLoaded', function() {
         fetchFacilities();
+        
+        // Delay to ensure DOM is fully rendered
+        setTimeout(() => {
+            // This will be handled by the general filtering code
+        }, 100);
     });
 
     function fetchFacilities() {
@@ -305,16 +368,183 @@
 
     function populateFacilitySelect() {
         const select = document.getElementById('facility_id');
+        const filterSelect = document.getElementById('facilityFilter');
+        
         select.innerHTML = '<option value="">Select Facility</option>';
+        filterSelect.innerHTML = '<option value="">All Facilities</option>';
 
         facilities.forEach(facility => {
             const option = document.createElement('option');
             option.value = facility.facility_id;
             option.textContent = facility.facility_name;
             select.appendChild(option);
+
+            const filterOption = document.createElement('option');
+            filterOption.value = facility.facility_id;
+            filterOption.textContent = facility.facility_name;
+            filterSelect.appendChild(filterOption);
         });
     }
 
+    // Filtering Functions
+    function collectReservationData() {
+        allReservations = [];
+        const scheduleItems = document.querySelectorAll('#scheduleSection > div');
+        
+        scheduleItems.forEach((item, dayIndex) => {
+            const reservationCards = item.querySelectorAll('.bg-white, .bg-red-600');
+            reservationCards.forEach(card => {
+                const purposeText = card.querySelector('span')?.textContent || '';
+                const facilityText = card.querySelectorAll('span')[1]?.textContent || '';
+                const timeText = card.querySelectorAll('span')[3]?.textContent || '';
+                const isAdminBlock = card.classList.contains('bg-red-600');
+                
+                allReservations.push({
+                    element: card.parentElement,
+                    dayElement: item,
+                    purpose: purposeText,
+                    facility: facilityText,
+                    time: timeText,
+                    isAdminBlock: isAdminBlock,
+                    dayIndex: dayIndex
+                });
+            });
+        });
+        
+        filteredReservations = [...allReservations];
+        updateFilterStatus();
+    }
+
+    function initializeFiltering() {
+        document.getElementById('applyFilters').addEventListener('click', applyFilters);
+        document.getElementById('clearFilters').addEventListener('click', clearFilters);
+        
+        // Real-time search
+        document.getElementById('searchFilter').addEventListener('input', applyFilters);
+    }
+
+    function applyFilters() {
+        const facilityFilter = document.getElementById('facilityFilter').value;
+        const typeFilter = document.getElementById('typeFilter').value;
+        const timeFilter = document.getElementById('timeFilter').value;
+        const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+
+        filteredReservations = allReservations.filter(reservation => {
+            // Facility filter
+            if (facilityFilter && !reservation.facility.toLowerCase().includes(facilityFilter.toLowerCase())) {
+                return false;
+            }
+
+            // Type filter
+            if (typeFilter) {
+                if (typeFilter === 'admin_block' && !reservation.isAdminBlock) return false;
+                if (typeFilter !== 'admin_block' && reservation.isAdminBlock) return false;
+                // For now, we'll keep it simple - regular reservations match single/consecutive/multiple
+            }
+
+            // Time filter
+            if (timeFilter && reservation.time !== 'N/A') {
+                const timeMatch = checkTimeRange(reservation.time, timeFilter);
+                if (!timeMatch) return false;
+            }
+
+            // Search filter
+            if (searchFilter && !reservation.purpose.toLowerCase().includes(searchFilter)) {
+                return false;
+            }
+
+            return true;
+        });
+
+        renderFilteredResults();
+        updateFilterStatus();
+    }
+
+    function checkTimeRange(timeText, range) {
+        if (timeText === 'N/A') return false;
+        
+        // Extract start time from the time text (format: "HH:MM AM/PM - HH:MM AM/PM")
+        const timeMatch = timeText.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i);
+        if (!timeMatch) return false;
+        
+        const startTime = timeMatch[1];
+        const hour = parseInt(startTime.split(':')[0]);
+        const isPM = startTime.includes('PM');
+        const hour24 = isPM && hour !== 12 ? hour + 12 : (hour === 12 && !isPM ? 0 : hour);
+
+        switch(range) {
+            case 'morning':
+                return hour24 >= 6 && hour24 < 12;
+            case 'afternoon':
+                return hour24 >= 12 && hour24 < 18;
+            case 'evening':
+                return hour24 >= 18 && hour24 <= 23;
+            default:
+                return true;
+        }
+    }
+
+    function renderFilteredResults() {
+        // Hide all day containers first
+        const allDayContainers = document.querySelectorAll('#scheduleSection > div');
+        allDayContainers.forEach(container => {
+            container.style.display = 'none';
+        });
+
+        // Group filtered reservations by day
+        const reservationsByDay = {};
+        filteredReservations.forEach(reservation => {
+            if (!reservationsByDay[reservation.dayIndex]) {
+                reservationsByDay[reservation.dayIndex] = [];
+            }
+            reservationsByDay[reservation.dayIndex].push(reservation);
+        });
+
+        // Show only days with filtered reservations
+        Object.keys(reservationsByDay).forEach(dayIndex => {
+            const dayContainer = allDayContainers[parseInt(dayIndex)];
+            if (dayContainer) {
+                dayContainer.style.display = 'flex';
+            }
+        });
+
+        // If no filters are active, show all days
+        const hasActiveFilters = document.getElementById('facilityFilter').value ||
+                                document.getElementById('typeFilter').value ||
+                                document.getElementById('timeFilter').value ||
+                                document.getElementById('searchFilter').value;
+
+        if (!hasActiveFilters) {
+            allDayContainers.forEach(container => {
+                container.style.display = 'flex';
+            });
+        }
+    }
+
+    function clearFilters() {
+        document.getElementById('facilityFilter').value = '';
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('timeFilter').value = '';
+        document.getElementById('searchFilter').value = '';
+        
+        filteredReservations = [...allReservations];
+        renderFilteredResults();
+        updateFilterStatus();
+    }
+
+    function updateFilterStatus() {
+        const statusElement = document.getElementById('filteredCount');
+        const totalDays = document.querySelectorAll('#scheduleSection > div').length;
+        const visibleDays = document.querySelectorAll('#scheduleSection > div[style*="flex"]').length;
+        
+        if (filteredReservations.length === allReservations.length) {
+            statusElement.textContent = 'Showing all reservations';
+        } else {
+            statusElement.textContent = `Showing ${filteredReservations.length} of ${allReservations.length} reservations`;
+        }
+    }
+
+    @if(isset($isAdmin) && $isAdmin)
     function openManageModal() {
         document.getElementById('manageModal').classList.remove('hidden');
     }
@@ -363,4 +593,201 @@
         }
     });
     @endif
+
+    // General filtering functionality for all users
+    let allFacilities = [];
+    let allReservationData = [];
+    let filteredReservationData = [];
+
+    // Initialize filtering for all users
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeGeneralFiltering();
+        
+        // Delay to ensure DOM is fully rendered
+        setTimeout(() => {
+            collectAllReservationData();
+        }, 100);
+    });
+
+    function initializeGeneralFiltering() {
+        fetchAllFacilities();
+        
+        document.getElementById('applyFilters').addEventListener('click', applyGeneralFilters);
+        document.getElementById('clearFilters').addEventListener('click', clearGeneralFilters);
+        
+        // Real-time search
+        document.getElementById('searchFilter').addEventListener('input', applyGeneralFilters);
+    }
+
+    function fetchAllFacilities() {
+        fetch('/api/facilities')
+            .then(response => response.json())
+            .then(data => {
+                allFacilities = data.facilities || [];
+                populateGeneralFacilitySelect();
+            })
+            .catch(error => console.error('Error fetching facilities:', error));
+    }
+
+    function populateGeneralFacilitySelect() {
+        const filterSelect = document.getElementById('facilityFilter');
+        if (filterSelect) {
+            filterSelect.innerHTML = '<option value="">All Facilities</option>';
+
+            allFacilities.forEach(facility => {
+                const filterOption = document.createElement('option');
+                filterOption.value = facility.facility_id;
+                filterOption.textContent = facility.facility_name;
+                filterSelect.appendChild(filterOption);
+            });
+        }
+    }
+
+    function collectAllReservationData() {
+        allReservationData = [];
+        const scheduleItems = document.querySelectorAll('#scheduleSection > div');
+        
+        scheduleItems.forEach((item, dayIndex) => {
+            const reservationCards = item.querySelectorAll('.bg-white, .bg-red-600');
+            reservationCards.forEach(card => {
+                const purposeSpans = card.querySelectorAll('span');
+                const purposeText = purposeSpans.length > 0 ? purposeSpans[0].textContent || '' : '';
+                const facilityText = purposeSpans.length > 1 ? purposeSpans[1].textContent || '' : '';
+                const timeText = purposeSpans.length > 3 ? purposeSpans[3].textContent || '' : '';
+                const isAdminBlock = card.classList.contains('bg-red-600');
+                
+                allReservationData.push({
+                    element: card.parentElement,
+                    dayElement: item,
+                    purpose: purposeText,
+                    facility: facilityText,
+                    time: timeText,
+                    isAdminBlock: isAdminBlock,
+                    dayIndex: dayIndex
+                });
+            });
+        });
+        
+        filteredReservationData = [...allReservationData];
+        updateGeneralFilterStatus();
+    }
+
+    function applyGeneralFilters() {
+        const facilityFilter = document.getElementById('facilityFilter').value;
+        const typeFilter = document.getElementById('typeFilter').value;
+        const timeFilter = document.getElementById('timeFilter').value;
+        const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+
+        filteredReservationData = allReservationData.filter(reservation => {
+            // Facility filter
+            if (facilityFilter && !reservation.facility.toLowerCase().includes(facilityFilter.toLowerCase())) {
+                return false;
+            }
+
+            // Type filter
+            if (typeFilter) {
+                if (typeFilter === 'admin_block' && !reservation.isAdminBlock) return false;
+                if (typeFilter !== 'admin_block' && reservation.isAdminBlock) return false;
+            }
+
+            // Time filter
+            if (timeFilter && reservation.time !== 'N/A') {
+                const timeMatch = checkGeneralTimeRange(reservation.time, timeFilter);
+                if (!timeMatch) return false;
+            }
+
+            // Search filter
+            if (searchFilter && !reservation.purpose.toLowerCase().includes(searchFilter)) {
+                return false;
+            }
+
+            return true;
+        });
+
+        renderGeneralFilteredResults();
+        updateGeneralFilterStatus();
+    }
+
+    function checkGeneralTimeRange(timeText, range) {
+        if (timeText === 'N/A') return false;
+        
+        // Extract start time from the time text (format: "HH:MM AM/PM - HH:MM AM/PM")
+        const timeMatch = timeText.match(/(\d{1,2}:\d{2}\s*(AM|PM))/i);
+        if (!timeMatch) return false;
+        
+        const startTime = timeMatch[1];
+        const hour = parseInt(startTime.split(':')[0]);
+        const isPM = startTime.includes('PM');
+        const hour24 = isPM && hour !== 12 ? hour + 12 : (hour === 12 && !isPM ? 0 : hour);
+
+        switch(range) {
+            case 'morning':
+                return hour24 >= 6 && hour24 < 12;
+            case 'afternoon':
+                return hour24 >= 12 && hour24 < 18;
+            case 'evening':
+                return hour24 >= 18 && hour24 <= 23;
+            default:
+                return true;
+        }
+    }
+
+    function renderGeneralFilteredResults() {
+        // Hide all day containers first
+        const allDayContainers = document.querySelectorAll('#scheduleSection > div');
+        allDayContainers.forEach(container => {
+            container.style.display = 'none';
+        });
+
+        // Group filtered reservations by day
+        const reservationsByDay = {};
+        filteredReservationData.forEach(reservation => {
+            if (!reservationsByDay[reservation.dayIndex]) {
+                reservationsByDay[reservation.dayIndex] = [];
+            }
+            reservationsByDay[reservation.dayIndex].push(reservation);
+        });
+
+        // Show only days with filtered reservations
+        Object.keys(reservationsByDay).forEach(dayIndex => {
+            const dayContainer = allDayContainers[parseInt(dayIndex)];
+            if (dayContainer) {
+                dayContainer.style.display = 'flex';
+            }
+        });
+
+        // If no filters are active, show all days
+        const hasActiveFilters = document.getElementById('facilityFilter').value ||
+                                document.getElementById('typeFilter').value ||
+                                document.getElementById('timeFilter').value ||
+                                document.getElementById('searchFilter').value;
+
+        if (!hasActiveFilters) {
+            allDayContainers.forEach(container => {
+                container.style.display = 'flex';
+            });
+        }
+    }
+
+    function clearGeneralFilters() {
+        document.getElementById('facilityFilter').value = '';
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('timeFilter').value = '';
+        document.getElementById('searchFilter').value = '';
+        
+        filteredReservationData = [...allReservationData];
+        renderGeneralFilteredResults();
+        updateGeneralFilterStatus();
+    }
+
+    function updateGeneralFilterStatus() {
+        const statusElement = document.getElementById('filteredCount');
+        if (statusElement) {
+            if (filteredReservationData.length === allReservationData.length) {
+                statusElement.textContent = 'Showing all reservations';
+            } else {
+                statusElement.textContent = `Showing ${filteredReservationData.length} of ${allReservationData.length} reservations`;
+            }
+        }
+    }
 </script>

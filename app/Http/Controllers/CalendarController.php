@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Models\ReservationRequest;
 use App\Models\AdminFacilityBlock;
+use App\Models\Facility;
 use Illuminate\Support\Facades\Log;
 
 class CalendarController extends Controller
@@ -20,22 +21,46 @@ class CalendarController extends Controller
         $isAdmin = $request->get('admin', false) ||
             (str_contains($request->headers->get('referer', ''), '/admin'));
 
+        // Get filter parameters
+        $facilityFilter = $request->get('facility_filter', 'all');
+        $typeFilter = $request->get('type_filter', 'all');
+
         $currentDate = Carbon::createFromDate($year, $month, 1);
         $monthName = $currentDate->format('F');
         $daysInMonth = $currentDate->daysInMonth;
         $firstDayOfMonth = $currentDate->dayOfWeek;
 
-        // Get all accepted reservations with user relationship
-        $allAcceptedReservations = ReservationRequest::where('status', 'accepted')
-            ->with(['facility', 'equipment', 'single', 'consecutive', 'multiple'])
-            ->get();
+        // Get all facilities for filter dropdown
+        $allFacilities = Facility::orderBy('facility_name')->get();
 
-        // Get admin facility blocks for the current month
-        $adminBlocks = AdminFacilityBlock::active()
+        // Build query for accepted reservations
+        $reservationQuery = ReservationRequest::where('status', 'accepted')
+            ->with(['facility', 'equipment', 'single', 'consecutive', 'multiple']);
+
+        // Apply facility filter if provided
+        if ($facilityFilter && $facilityFilter !== 'all') {
+            $reservationQuery->where('facility_id', $facilityFilter);
+        }
+
+        // Apply reservation type filter if provided
+        if ($typeFilter && $typeFilter !== 'all') {
+            $reservationQuery->where('reservation_type', ucfirst($typeFilter));
+        }
+
+        $allAcceptedReservations = $reservationQuery->get();
+
+        // Get admin facility blocks for the current month with facility filter
+        $adminBlockQuery = AdminFacilityBlock::active()
             ->with('facility')
             ->whereYear('date', $year)
-            ->whereMonth('date', $month)
-            ->get();
+            ->whereMonth('date', $month);
+
+        // Apply facility filter to admin blocks if provided
+        if ($facilityFilter && $facilityFilter !== 'all') {
+            $adminBlockQuery->where('facility_id', $facilityFilter);
+        }
+
+        $adminBlocks = $adminBlockQuery->get();
 
         Log::info('Total accepted reservations: ' . $allAcceptedReservations->count());
         Log::info('Total admin blocks: ' . $adminBlocks->count());
@@ -133,8 +158,105 @@ class CalendarController extends Controller
 
         return view('calendar-activities', compact(
             'today', 'currentDate', 'monthName', 'year', 'month',
-            'daysInMonth', 'firstDayOfMonth', 'reservations', 'reservationsByDate', 'isAdmin'
+            'daysInMonth', 'firstDayOfMonth', 'reservations', 'reservationsByDate', 'isAdmin',
+            'allFacilities', 'facilityFilter', 'typeFilter'
         ));
+    }
+
+    /**
+     * AJAX endpoint for filtering calendar events
+     */
+    public function filterCalendar(Request $request)
+    {
+        $month = $request->get('month', Carbon::now()->month);
+        $year = $request->get('year', Carbon::now()->year);
+        $facilityFilter = $request->get('facility_filter', 'all');
+        $typeFilter = $request->get('type_filter', 'all');
+        $isAdmin = $request->get('admin', false);
+
+        // Build query for accepted reservations
+        $reservationQuery = ReservationRequest::where('status', 'accepted')
+            ->with(['facility', 'equipment', 'single', 'consecutive', 'multiple']);
+
+        // Apply facility filter if provided
+        if ($facilityFilter && $facilityFilter !== 'all') {
+            $reservationQuery->where('facility_id', $facilityFilter);
+        }
+
+        // Apply reservation type filter if provided
+        if ($typeFilter && $typeFilter !== 'all') {
+            $reservationQuery->where('reservation_type', ucfirst($typeFilter));
+        }
+
+        $allAcceptedReservations = $reservationQuery->get();
+
+        // Get admin facility blocks for the current month with facility filter
+        $adminBlockQuery = AdminFacilityBlock::active()
+            ->with('facility')
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month);
+
+        // Apply facility filter to admin blocks if provided
+        if ($facilityFilter && $facilityFilter !== 'all') {
+            $adminBlockQuery->where('facility_id', $facilityFilter);
+        }
+
+        $adminBlocks = $adminBlockQuery->get();
+
+        // Group reservations and admin blocks by date
+        $reservationsByDate = collect();
+
+        // Process regular reservations
+        foreach ($allAcceptedReservations as $reservation) {
+            $dates = $this->getReservationDates($reservation);
+            $reservation->formatted_times = $this->getFormattedReservationTime($reservation);
+            $reservation->is_admin_block = false;
+
+            foreach ($dates as $date) {
+                if (!$date) continue;
+                try {
+                    $carbonDate = Carbon::parse($date);
+                    if ($carbonDate->year == $year && $carbonDate->month == $month) {
+                        $dateKey = $carbonDate->format('Y-m-d');
+                        if (!$reservationsByDate->has($dateKey)) {
+                            $reservationsByDate[$dateKey] = collect();
+                        }
+                        $reservationsByDate[$dateKey]->push($reservation);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error grouping reservation by date: ' . $date . ' - ' . $e->getMessage());
+                }
+            }
+        }
+
+        // Process admin blocks
+        foreach ($adminBlocks as $block) {
+            $dateKey = $block->date->format('Y-m-d');
+
+            $adminBlockReservation = (object) [
+                'block_id' => $block->block_id,
+                'purpose' => $block->purpose,
+                'facility' => $block->facility,
+                'notes' => $block->notes,
+                'is_admin_block' => true,
+                'formatted_times' => [
+                    'start_time' => Carbon::parse($block->start_time)->format('g:i A'),
+                    'end_time' => Carbon::parse($block->end_time)->format('g:i A'),
+                    'raw_start' => $block->start_time,
+                    'raw_end' => $block->end_time
+                ]
+            ];
+
+            if (!$reservationsByDate->has($dateKey)) {
+                $reservationsByDate[$dateKey] = collect();
+            }
+            $reservationsByDate[$dateKey]->push($adminBlockReservation);
+        }
+
+        return response()->json([
+            'success' => true,
+            'reservationsByDate' => $reservationsByDate->toArray()
+        ]);
     }
 
     private function getReservationDates($reservation)

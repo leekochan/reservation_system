@@ -30,6 +30,25 @@ class ReservationController extends Controller
         ]);
     }
 
+    /**
+     * Get available units for specific equipment on a specific date
+     */
+    public function getAvailableUnits(Request $request)
+    {
+        $request->validate([
+            'equipment_id' => 'required|exists:equipments,equipment_id',
+            'date' => 'required|date_format:Y-m-d'
+        ]);
+
+        $equipment = Equipment::findOrFail($request->equipment_id);
+        $availableUnits = $equipment->getAvailableUnitsForDate($request->date);
+
+        return response()->json([
+            'available_units' => $availableUnits,
+            'total_units' => $equipment->units
+        ]);
+    }
+
     public function storeReservation(Request $request)
     {
         // Basic validation rules

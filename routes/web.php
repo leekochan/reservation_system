@@ -31,10 +31,13 @@ Route::prefix('user')->group(function () {
     Route::get('/equipments', [EquipmentsController::class, 'userEquipments']);
     Route::get('/reservation', [ReservationController::class, 'userReservation']);
     Route::post('/reservation', [ReservationController::class, 'storeReservation'])->name('reservation.store');
+    Route::get('/equipment/available-units', [ReservationController::class, 'getAvailableUnits'])->name('equipment.available-units');
+    Route::get('/filter-events', [DashboardController::class, 'filterEvents'])->name('user.filter.events');
 });
 
 Route::get('/calendar_of_activities', [CalendarController::class, 'calendar']);
 Route::get('/calendar-activities', [App\Http\Controllers\CalendarController::class, 'index'])->name('calendar.activities');
+Route::get('/calendar-filter', [CalendarController::class, 'filterCalendar'])->name('calendar.filter');
 
 //Route::get('/admin', [AdminDashboardController::class, 'adminDashboard']);
 //Route::get('/admin/facilities', [AdminFacilityController::class, 'adminFacilities']);
@@ -258,10 +261,10 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
 
         // Collect all blocked time ranges with buffers
         $blockedRanges = [];
-        
+
         foreach ($existingReservations as $reservation) {
             $detail = $reservation->reservationDetail;
-            
+
             if ($detail instanceof Single) {
                 if ($detail->start_date === $date) {
                     $blockedRanges[] = [
@@ -310,11 +313,11 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
             $startTime = new DateTime($range['start']);
             $startTime->sub(new DateInterval('PT1H'));
             $bufferedStart = max('08:00', $startTime->format('H:i'));
-            
+
             $endTime = new DateTime($range['end']);
             $endTime->add(new DateInterval('PT1H'));
             $bufferedEnd = min('17:30', $endTime->format('H:i'));
-            
+
             $bufferedRanges[] = [
                 'start' => $bufferedStart,
                 'end' => $bufferedEnd
@@ -345,7 +348,7 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
         // Check for available time gaps of at least 2 hours
         $businessStart = '08:00';
         $businessEnd = '17:30';
-        
+
         // Check gap before first blocked range
         if (!empty($mergedRanges)) {
             $firstBlockStart = $mergedRanges[0]['start'];
@@ -356,17 +359,17 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
             // No blocked ranges, full day available
             return true;
         }
-        
+
         // Check gaps between blocked ranges
         for ($i = 0; $i < count($mergedRanges) - 1; $i++) {
             $currentEnd = $mergedRanges[$i]['end'];
             $nextStart = $mergedRanges[$i + 1]['start'];
-            
+
             if ($calculateTimeDifference($currentEnd, $nextStart) >= 2) {
                 return true;
             }
         }
-        
+
         // Check gap after last blocked range
         if (!empty($mergedRanges)) {
             $lastBlockEnd = end($mergedRanges)['end'];
@@ -374,7 +377,7 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
                 return true;
             }
         }
-        
+
         return false;
     };
 
@@ -613,7 +616,7 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
 // API route for fetching available times for a specific date and facility
 Route::get('/api/time-availability/{facilityId}', function($facilityId) {
     $date = request()->query('date');
-    
+
     if (!$date) {
         return response()->json(['error' => 'Date parameter is required'], 400);
     }
@@ -654,11 +657,11 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
 
     // Collect all blocked time ranges
     $blockedRanges = [];
-    
+
     // Add reservation time ranges
     foreach ($existingReservations as $reservation) {
         $detail = $reservation->reservationDetail;
-        
+
         if ($detail instanceof Single) {
             if ($detail->start_date === $date) {
                 $blockedRanges[] = [
@@ -700,7 +703,7 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
             }
         }
     }
-    
+
     // Add admin block time ranges
     foreach ($adminBlocks as $block) {
         $blockedRanges[] = [
@@ -736,16 +739,16 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
             $startTime = new DateTime($range['start']);
             $startTime->sub(new DateInterval('PT1H'));
             $bufferedStart = $startTime->format('H:i');
-            
+
             // Add 1 hour to end time
             $endTime = new DateTime($range['end']);
             $endTime->add(new DateInterval('PT1H'));
             $bufferedEnd = $endTime->format('H:i');
-            
+
             // Ensure we don't go outside business hours
             if ($bufferedStart < '08:00') $bufferedStart = '08:00';
             if ($bufferedEnd > '17:30') $bufferedEnd = '17:30';
-            
+
             $bufferedRanges[] = [
                 'start' => $bufferedStart,
                 'end' => $bufferedEnd

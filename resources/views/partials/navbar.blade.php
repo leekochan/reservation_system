@@ -27,8 +27,42 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const sections = document.querySelectorAll('section, div[id]');
         const navLinks = document.querySelectorAll('.nav-link');
+        const currentPath = window.location.pathname;
+
+        // Highlight active nav item based on current path
+        navLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href) {
+                // Exact match for user dashboard
+                if (currentPath === '/user' && href === '/user') {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
+                }
+                // Exact match for calendar_of_activities
+                else if (currentPath === '/calendar_of_activities' && href === '/calendar_of_activities') {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
+                }
+                // Exact match for reservation
+                else if (currentPath === '/reservation' && href === '/reservation') {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
+                }
+                // For other routes (like /user/facilities), check if current path starts with the href
+                else if (href !== '/user' && href !== '/calendar_of_activities' && href !== '/reservation' && currentPath.startsWith(href)) {
+                    link.classList.add('border-white', 'text-white');
+                    link.classList.remove('border-transparent', 'text-gray-300');
+                }
+                // Default inactive state
+                else {
+                    link.classList.remove('border-white', 'text-white');
+                    link.classList.add('border-transparent', 'text-gray-300');
+                }
+            }
+        });
+
+        const sections = document.querySelectorAll('section, div[id]');
         const headerHeight = document.querySelector('nav').offsetHeight;
 
         // Smooth scroll for nav links only when target is an in-page section

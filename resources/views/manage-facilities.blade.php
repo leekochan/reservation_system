@@ -10,11 +10,21 @@
 @include('partials.admin-navbar')
 
 <section id="facilities" class="mt-12 bg-white py-16">
-    <div class="max-w-6xl mx-auto px-4" x-data="{ showAddModal: false }">
+    <div class="max-w-6xl mx-auto px-4" x-data="{
+        showAddModal: false,
+        openAddModal() {
+            this.showAddModal = true;
+            if (window.lockBodyScroll) window.lockBodyScroll();
+        },
+        closeAddModal() {
+            this.showAddModal = false;
+            if (window.unlockBodyScroll) window.unlockBodyScroll();
+        }
+    }" x-init="showAddModal = false">
         <!-- Header -->
         <div class="flex items-center justify-between mb-10">
             <h2 class="text-3xl font-bold">Facilities</h2>
-            <button @click="showAddModal = true" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white font-semibold py-2 px-5 rounded-md flex items-center gap-2">
+            <button @click="openAddModal()" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white font-semibold py-2 px-5 rounded-md flex items-center gap-2 transition-all duration-500 ease-out transform hover:scale-110 hover:shadow-xl hover:-translate-y-1 active:scale-95 active:translate-y-0">
                 <span class="text-lg">＋</span> ADD
             </button>
         </div>
@@ -22,7 +32,17 @@
         <!-- Facilities Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($facilities as $facility)
-                <div x-data="{ showModal: false }">
+                <div x-data="{
+                    showModal: false,
+                    openModal() {
+                        this.showModal = true;
+                        if (window.lockBodyScroll) window.lockBodyScroll();
+                    },
+                    closeModal() {
+                        this.showModal = false;
+                        if (window.unlockBodyScroll) window.unlockBodyScroll();
+                    }
+                }" x-init="showModal = false">
                     <div class="bg-gray-100 rounded-lg shadow p-4 flex flex-col justify-between h-full">
                         <img src="{{ asset('storage/' . $facility->picture) }}" alt="{{ $facility->facility_name }}" class="w-full h-40 object-cover rounded">
                         <div class="mt-4">
@@ -38,14 +58,14 @@
                         </div>
 
                         <div class="flex justify-end mt-4 gap-2">
-                            <button @click="showModal = true" class="hover:bg-gray-200 p-1 rounded">
+                            <button @click="openModal()" class="hover:bg-gray-200 p-1 rounded transition-all duration-300 ease-in-out transform hover:scale-110 hover:shadow-md">
                                 <img src="{{ asset('pictures/icons/edit.png') }}" alt="Edit" class="w-5 h-5">
                             </button>
                             <form action="{{ route('facilities.destroy', $facility->facility_id) }}" method="POST"
                                   onsubmit="return confirm('Are you sure you want to delete this facility?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="hover:bg-gray-200 p-1 rounded">
+                                <button type="submit" class="hover:bg-gray-200 p-1 rounded transition-all duration-300 ease-in-out transform hover:scale-110 hover:shadow-md">
                                     <img src="{{ asset('pictures/icons/delete.png') }}" alt="Delete" class="w-5 h-5">
                                 </button>
                             </form>
@@ -53,9 +73,27 @@
                     </div>
 
                     <!-- Edit Modal -->
-                    <div x-show="showModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-                        <div class="bg-white rounded-lg p-6 w-[90%] max-w-md relative border-2 border-[#7A1D30]">
-                            <button @click="showModal = false" class="absolute top-2 right-2 text-black text-xl">&times;</button>
+                    <div x-show="showModal"
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         x-transition:leave="transition ease-in duration-200"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0"
+                         @click.self="closeModal()"
+                         @keydown.escape.window="closeModal()"
+                         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+                         style="display: none;">
+                        <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative border-2 border-[#7A1D30] shadow-2xl"
+                             x-transition:enter="transition ease-out duration-300 transform"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-200 transform"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             @click.stop>
+                            <button @click="closeModal()" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10">&times;</button>
                             <h3 class="text-xl font-bold mb-4">Edit Facility</h3>
 
                             <form action="{{ route('facilities.update', $facility->facility_id) }}" method="POST" enctype="multipart/form-data">
@@ -66,18 +104,18 @@
                                     <div>
                                         <label class="block font-semibold mb-1">Facility Name:</label>
                                         <input type="text" name="facility_name" value="{{ $facility->facility_name }}"
-                                               class="w-full border px-3 py-2 rounded" required>
+                                               class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent" required>
                                     </div>
 
                                     <div>
                                         <label class="block font-semibold mb-1">Condition:</label>
                                         <input type="text" name="facility_condition" value="{{ $facility->facility_condition }}"
-                                               class="w-full border px-3 py-2 rounded">
+                                               class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                                     </div>
 
                                     <div>
                                         <label class="block font-semibold mb-1">Status:</label>
-                                        <select name="status" class="w-full border px-3 py-2 rounded" required>
+                                        <select name="status" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent" required>
                                             <option value="available" {{ $facility->status == 'available' ? 'selected' : '' }}>Available</option>
                                             <option value="not_available" {{ $facility->status == 'not_available' ? 'selected' : '' }}>Not Available</option>
                                         </select>
@@ -88,19 +126,19 @@
                                             <label class="block font-semibold mb-1">Hourly Rate:</label>
                                             <input type="number" name="facility_per_hour_rate"
                                                    value="{{ $facility->details->facility_per_hour_rate ?? '' }}"
-                                                   step="0.01" min="0" class="w-full border px-3 py-2 rounded">
+                                                   step="0.01" min="0" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                                         </div>
                                         <div>
                                             <label class="block font-semibold mb-1">Package 1:</label>
                                             <input type="number" name="facility_package_rate1"
                                                    value="{{ $facility->details->facility_package_rate1 ?? '' }}"
-                                                   step="0.01" min="0" class="w-full border px-3 py-2 rounded">
+                                                   step="0.01" min="0" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                                         </div>
                                         <div>
                                             <label class="block font-semibold mb-1">Package 2:</label>
                                             <input type="number" name="facility_package_rate2"
                                                    value="{{ $facility->details->facility_package_rate2 ?? '' }}"
-                                                   step="0.01" min="0" class="w-full border px-3 py-2 rounded">
+                                                   step="0.01" min="0" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                                         </div>
                                     </div>
 
@@ -122,11 +160,11 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-6 flex justify-end gap-3">
-                                    <button type="button" @click="showModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100">
+                                <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+                                    <button type="button" @click="closeModal()" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-md">
                                         Cancel
                                     </button>
-                                    <button type="submit" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white px-5 py-2 rounded">
+                                    <button type="submit" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white px-5 py-2 rounded transition-all duration-500 ease-out transform hover:scale-110 hover:shadow-xl hover:-translate-y-1 active:scale-95 active:translate-y-0">
                                         Save Changes
                                     </button>
                                 </div>
@@ -137,15 +175,33 @@
             @endforeach
 
             <!-- Add Card -->
-            <button @click="showAddModal = true" class="flex items-center justify-center bg-gray-200 rounded-lg shadow hover:bg-gray-300 transition h-60 w-full">
+            <button @click="openAddModal()" class="flex items-center justify-center bg-gray-200 rounded-lg shadow hover:bg-gray-300 transition-all duration-500 ease-out transform hover:scale-105 hover:shadow-xl hover:-translate-y-2 h-60 w-full">
                 <div class="text-5xl text-gray-600 font-light">+</div>
             </button>
         </div>
 
         <!-- Add Modal -->
-        <div x-show="showAddModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-            <div class="bg-white rounded-lg p-6 w-[90%] max-w-md relative border-2 border-[#7A1D30]">
-                <button @click="showAddModal = false" class="absolute top-2 right-2 text-black text-xl">&times;</button>
+        <div x-show="showAddModal"
+             x-cloak
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click.self="closeAddModal()"
+             @keydown.escape.window="closeAddModal()"
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+             style="display: none;">
+            <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative border-2 border-[#7A1D30] shadow-2xl"
+                 x-transition:enter="transition ease-out duration-300 transform"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200 transform"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @click.stop>
+                <button @click="closeAddModal()" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10">&times;</button>
                 <h3 class="text-xl font-bold mb-4">Add New Facility</h3>
 
                 <form method="POST" action="{{ route('facilities.store') }}" enctype="multipart/form-data">
@@ -154,12 +210,12 @@
                     <div class="space-y-4">
                         <div>
                             <label class="block font-semibold mb-1">Facility Name:</label>
-                            <input type="text" name="facility_name" class="w-full border px-3 py-2 rounded" required>
+                            <input type="text" name="facility_name" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent" required>
                         </div>
 
                         <div>
                             <label class="block font-semibold mb-1">Status:</label>
-                            <select name="status" class="w-full border px-3 py-2 rounded" required>
+                            <select name="status" class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent" required>
                                 <option value="available" selected>Available</option>
                                 <option value="not_available">Not Available</option>
                             </select>
@@ -168,18 +224,18 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block font-semibold mb-1">Hourly Rate:</label>
-                                <input name="facility_per_hour_rate" step="0.01" min="0"
-                                       class="w-full border px-3 py-2 rounded">
+                                <input type="number" name="facility_per_hour_rate" step="0.01" min="0"
+                                       class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1">Package 1:</label>
-                                <input name="facility_package_rate1" step="0.01" min="0"
-                                       class="w-full border px-3 py-2 rounded">
+                                <input type="number" name="facility_package_rate1" step="0.01" min="0"
+                                       class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1">Package 2:</label>
-                                <input name="facility_package_rate2" step="0.01" min="0"
-                                       class="w-full border px-3 py-2 rounded">
+                                <input type="number" name="facility_package_rate2" step="0.01" min="0"
+                                       class="w-full border border-gray-300 px-3 py-2 rounded focus:ring-2 focus:ring-[#7A1D30] focus:border-transparent">
                             </div>
                         </div>
 
@@ -196,11 +252,11 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" @click="showAddModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100">
+                    <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+                        <button type="button" @click="closeAddModal()" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-md">
                             Cancel
                         </button>
-                        <button type="submit" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white px-5 py-2 rounded">
+                        <button type="submit" class="bg-[#7A1D30] hover:bg-[#5c1524] text-white px-5 py-2 rounded transition-all duration-500 ease-out transform hover:scale-110 hover:shadow-xl hover:-translate-y-1 active:scale-95 active:translate-y-0">
                             Add Facility
                         </button>
                     </div>
@@ -242,6 +298,15 @@
                 }
             });
         });
+
+        // Modal body scroll lock/unlock functions
+        window.lockBodyScroll = function() {
+            document.body.classList.add('modal-open');
+        };
+
+        window.unlockBodyScroll = function() {
+            document.body.classList.remove('modal-open');
+        };
     });
 </script>
 </body>
