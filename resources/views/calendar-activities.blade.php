@@ -776,7 +776,39 @@
         }
     });
     @endif
+
+    // Scroll to Top functionality
+    window.addEventListener('scroll', function() {
+        const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+        if (window.pageYOffset > 300) {
+            scrollToTopBtn.style.display = 'block';
+            scrollToTopBtn.style.opacity = '1';
+        } else {
+            scrollToTopBtn.style.opacity = '0';
+            setTimeout(() => {
+                if (window.pageYOffset <= 300) {
+                    scrollToTopBtn.style.display = 'none';
+                }
+            }, 300);
+        }
+    });
+
+    function scrollToTop() {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
 </script>
+
+<!-- Scroll to Top Button -->
+<button id="scrollToTopBtn" onclick="scrollToTop()" 
+        class="fixed bottom-6 right-6 bg-[#7B172E] hover:bg-[#5a0f20] text-white p-3 rounded-full shadow-lg transition-all duration-300 z-50" 
+        style="display: none; opacity: 0;">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+</button>
 
 </body>
 </html>
