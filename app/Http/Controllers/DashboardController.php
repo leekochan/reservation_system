@@ -91,7 +91,19 @@ class DashboardController extends Controller
             ->values()
             ->all();
 
-        return view('user-dashboard', compact('facilities', 'events', 'allFacilities', 'facilityFilter', 'typeFilter'));
+        // Group events by date and separate today's events
+        $groupedEvents = collect($events)->groupBy('date');
+        $todayEvents = $groupedEvents->get(Carbon::now()->format('Y-m-d'), collect());
+        $otherEvents = $groupedEvents->except(Carbon::now()->format('Y-m-d'))->sortKeys();
+        
+        // Ensure each group in otherEvents is a collection
+        $otherEvents = $otherEvents->map(function($dayEvents) {
+            return collect($dayEvents);
+        });
+        
+
+
+        return view('user-dashboard', compact('facilities', 'events', 'allFacilities', 'facilityFilter', 'typeFilter', 'todayEvents', 'otherEvents'));
     }
 
     /**

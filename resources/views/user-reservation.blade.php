@@ -9,34 +9,31 @@
 @include('partials.navbar')
 
 {{-- Success message removed since payment estimation is shown before submission --}}
-{{-- @if(session('success'))
-    <div class="fixed top-4 right-4 bg-white text-gray-800 px-6 py-3 rounded-lg shadow-lg z-50 max-w-3xl overflow-y-auto max-h-96 border-l-4 border-green-500" id="success-message">
-        <div class="flex justify-between items-start">
-            <div class="flex-1">
-                <div class="flex items-center mb-2">
-                    <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-2">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-green-700">Reservation Submitted Successfully!</h3>
+@if(session('success'))
+    <!-- Simple Alert Dialog Overlay -->
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="success-overlay">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <div class="text-center">
+                <div class="text-gray-800 mb-4">
+                    Reservation submitted successfully!<br>Please wait for the admin approval of your reservation.
                 </div>
-                <div class="text-sm text-gray-700">
-                    {!! session('success') !!}
-                </div>
+                <button onclick="document.getElementById('success-overlay').style.display = 'none'" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition-colors">
+                    OK
+                </button>
             </div>
-            <button onclick="document.getElementById('success-message').style.display = 'none'" class="ml-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         </div>
     </div>
     <script>
+        // Auto-close after 5 seconds if user doesn't click OK
         setTimeout(() => {
-            const successMsg = document.getElementById('success-message');
-            if (successMsg) {
-                successMsg.style.display = 'none';
+            const successOverlay = document.getElementById('success-overlay');
+            if (successOverlay) {
+                successOverlay.style.display = 'none';
             }
-        }, 20000); // Increased timeout for detailed message
+        }, 5000);
     </script>
-@endif --}}
+@endif
 
 @if(session('error'))
     <div class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50" id="error-message">

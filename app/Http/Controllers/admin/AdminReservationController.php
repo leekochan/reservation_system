@@ -15,6 +15,9 @@ class AdminReservationController extends Controller
      */
     public function index()
     {
+        // Automatically update expired accepted reservations to completed
+        $this->updateExpiredAcceptedReservations();
+        
         // Get counts for each status
         $pendingCount = ReservationRequest::where('status', 'pending')->count();
         $acceptedCount = ReservationRequest::where('status', 'accepted')->count();
@@ -29,6 +32,30 @@ class AdminReservationController extends Controller
             'reservationDetail'
         ])->orderBy('created_at', 'desc')->get();
 
+        // Format the reservation details to match the API structure
+        $allReservations = $allReservations->map(function($reservation) {
+            $reservationArray = $reservation->toArray();
+            
+            // Format the reservation_detail to match the API structure
+            if ($reservation->reservationDetail) {
+                $reservationArray['reservation_detail'] = [
+                    'start_date' => $reservation->reservationDetail->start_date,
+                    'end_date' => $reservation->reservationDetail->end_date ?? null,
+                    'time_from' => $reservation->reservationDetail->time_from ?? null,
+                    'time_to' => $reservation->reservationDetail->time_to ?? null,
+                    'start_time_from' => $reservation->reservationDetail->start_time_from ?? null,
+                    'start_time_to' => $reservation->reservationDetail->start_time_to ?? null,
+                    'end_time_from' => $reservation->reservationDetail->end_time_from ?? null,
+                    'end_time_to' => $reservation->reservationDetail->end_time_to ?? null,
+                    'intermediate_date' => $reservation->reservationDetail->intermediate_date ?? null,
+                    'intermediate_time_from' => $reservation->reservationDetail->intermediate_time_from ?? null,
+                    'intermediate_time_to' => $reservation->reservationDetail->intermediate_time_to ?? null
+                ];
+            }
+            
+            return $reservationArray;
+        });
+
         return view('reservation', compact(
             'allReservations',
             'pendingCount',
@@ -36,6 +63,57 @@ class AdminReservationController extends Controller
             'declinedCount',
             'completedCount'
         ));
+    }
+
+    /**
+     * Update expired accepted reservations to completed status
+     */
+    private function updateExpiredAcceptedReservations()
+    {
+        $acceptedReservations = ReservationRequest::where('status', 'accepted')
+            ->with(['reservationDetail'])
+            ->get();
+
+        $today = \Carbon\Carbon::today();
+        $updatedCount = 0;
+
+        foreach ($acceptedReservations as $reservation) {
+            $shouldComplete = false;
+
+            // Check if the reservation has passed its date
+            if ($reservation->reservationDetail) {
+                $detail = $reservation->reservationDetail;
+                
+                if ($reservation->reservation_type === 'Single') {
+                    // For single day reservations, check if the start date has passed
+                    if ($detail->start_date && \Carbon\Carbon::parse($detail->start_date)->lt($today)) {
+                        $shouldComplete = true;
+                    }
+                } elseif ($reservation->reservation_type === 'Consecutive' || $reservation->reservation_type === 'Multiple') {
+                    // For consecutive/multiple day reservations, check if the end date has passed
+                    if ($detail->end_date && \Carbon\Carbon::parse($detail->end_date)->lt($today)) {
+                        $shouldComplete = true;
+                    }
+                    // Also check if intermediate date has passed (if exists)
+                    if ($detail->intermediate_date && \Carbon\Carbon::parse($detail->intermediate_date)->lt($today)) {
+                        $shouldComplete = true;
+                    }
+                }
+            } else {
+                // If no reservation detail, check transaction date
+                if ($reservation->transaction_date && \Carbon\Carbon::parse($reservation->transaction_date)->lt($today)) {
+                    $shouldComplete = true;
+                }
+            }
+
+            if ($shouldComplete) {
+                $reservation->status = 'completed';
+                $reservation->save();
+                $updatedCount++;
+            }
+        }
+
+        return $updatedCount;
     }
 
     /**

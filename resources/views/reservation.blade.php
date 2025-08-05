@@ -254,6 +254,18 @@ function createReservationCard(reservation) {
                                 Decline
                             </button>
                         ` : ''}
+                        ${reservation.status === 'accepted' ? `
+                            <button onclick="completeReservation(${reservation.reservation_id})" 
+                                    class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors mr-1">
+                                Complete
+                            </button>
+                        ` : ''}
+                        ${['accepted', 'declined', 'completed'].includes(reservation.status) ? `
+                            <button onclick="deleteReservation(${reservation.reservation_id})" 
+                                    class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors">
+                                Delete
+                            </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -465,6 +477,39 @@ function showReservationModal(reservation) {
                 </div>
             </div>
         ` : ''}
+        ${reservation.status === 'accepted' ? `
+            <div class="mt-8 pt-6 border-t-2 border-gray-200 bg-gray-50 p-4 rounded-lg">
+                <div class="flex gap-4 justify-end">
+                    <button onclick="completeReservation(${reservation.reservation_id})" 
+                            class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg flex items-center font-semibold">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Mark as Completed
+                    </button>
+                    <button onclick="deleteReservation(${reservation.reservation_id})" 
+                            class="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg flex items-center font-semibold">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete Reservation
+                    </button>
+                </div>
+            </div>
+        ` : ''}
+        ${['declined', 'completed'].includes(reservation.status) ? `
+            <div class="mt-8 pt-6 border-t-2 border-gray-200 bg-gray-50 p-4 rounded-lg">
+                <div class="flex gap-4 justify-end">
+                    <button onclick="deleteReservation(${reservation.reservation_id})" 
+                            class="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg flex items-center font-semibold">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete Reservation
+                    </button>
+                </div>
+            </div>
+        ` : ''}
     `;
     
     modal.classList.remove('hidden');
@@ -539,6 +584,71 @@ function declineReservation(reservationId) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error declining reservation');
+    });
+}
+
+function completeReservation(reservationId) {
+    if (!confirm('Are you sure you want to mark this reservation as completed?')) return;
+    
+    fetch(`/admin/reservations/${reservationId}/complete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Reservation marked as completed successfully!');
+            // Update the reservation in our local data
+            const reservation = allReservations.find(r => r.reservation_id === reservationId);
+            if (reservation) {
+                reservation.status = 'completed';
+            }
+            // Refresh the current view
+            filterReservations(currentStatus);
+            closeModal();
+            // Refresh page to update counts
+            location.reload();
+        } else {
+            alert('Error completing reservation: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error completing reservation');
+    });
+}
+
+function deleteReservation(reservationId) {
+    if (!confirm('Are you sure you want to delete this reservation? This action cannot be undone.')) return;
+    
+    fetch(`/admin/reservations/${reservationId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Reservation deleted successfully!');
+            // Remove the reservation from our local data
+            allReservations = allReservations.filter(r => r.reservation_id !== reservationId);
+            // Refresh the current view
+            filterReservations(currentStatus);
+            closeModal();
+            // Refresh page to update counts
+            location.reload();
+        } else {
+            alert('Error deleting reservation: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting reservation');
     });
 }
 

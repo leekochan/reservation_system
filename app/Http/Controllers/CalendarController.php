@@ -33,8 +33,8 @@ class CalendarController extends Controller
         // Get all facilities for filter dropdown
         $allFacilities = Facility::orderBy('facility_name')->get();
 
-        // Build query for accepted reservations
-        $reservationQuery = ReservationRequest::where('status', 'accepted')
+        // Build query for accepted and completed reservations
+        $reservationQuery = ReservationRequest::whereIn('status', ['accepted', 'completed'])
             ->with(['facility', 'equipment', 'single', 'consecutive', 'multiple']);
 
         // Apply facility filter if provided

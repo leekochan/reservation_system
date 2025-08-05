@@ -223,8 +223,9 @@
                     const date = new Date(year, month - 1, i);
                     const dateString = formatDate(date);
 
-                    // Check if date is in the past
+                    // Check if date is in the past or today (same day as reservation is made)
                     const isPast = date < today;
+                    const isToday = date.getTime() === today.getTime();
 
                     // Check if date is unavailable
                     const isUnavailable = data.unavailable.includes(dateString);
@@ -255,7 +256,7 @@
                     let dayClass = 'calendar-day ';
                     if (!selectedFacility) {
                         dayClass += 'no-facility';
-                    } else if (isPast) {
+                    } else if (isPast || isToday) {
                         dayClass += 'unavailable';
                     } else if (isUnavailable) {
                         dayClass += 'unavailable';
@@ -272,13 +273,15 @@
                     dayElement.textContent = i;
                     dayElement.dataset.date = dateString;
 
-                    // Add tooltip for pending dates
+                    // Add tooltip for pending dates and today
                     if (isPending || consecutiveHasPending) {
                         dayElement.title = 'Warning: There is a pending reservation for this date';
+                    } else if (isToday) {
+                        dayElement.title = 'Cannot reserve for today. Please select a future date.';
                     }
 
-                    // Only make clickable if available and not in past
-                    if (selectedFacility && !isPast && (isConsecutiveStart || (reservationType !== 'consecutive' && !isUnavailable))) {
+                    // Only make clickable if available and not in past and not today
+                    if (selectedFacility && !isPast && !isToday && (isConsecutiveStart || (reservationType !== 'consecutive' && !isUnavailable))) {
                         dayElement.addEventListener('click', function() {
                             handleDateSelection(dateString);
                         });

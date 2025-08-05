@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 class Consecutive extends Model
 {
     protected $table = 'consecutive';
+    protected $primaryKey = 'consecutive_id';
     
     protected $fillable = [
         'reservation_id',

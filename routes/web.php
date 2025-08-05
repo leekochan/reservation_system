@@ -228,7 +228,8 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
                         } elseif ($type === Consecutive::class) {
                             $q->where(function($subQuery) use ($date) {
                                 $subQuery->where('start_date', $date)
-                                    ->orWhere('end_date', $date);
+                                    ->orWhere('end_date', $date)
+                                    ->orWhere('intermediate_date', $date);
                             });
                         } elseif ($type === Multiple::class) {
                             $q->where(function($subQuery) use ($date) {
@@ -277,6 +278,12 @@ Route::get('/api/availability/{facilityId}', function($facilityId) {
                     $blockedRanges[] = [
                         'start' => $detail->start_time_from,
                         'end' => $detail->start_time_to
+                    ];
+                }
+                if ($detail->intermediate_date === $date) {
+                    $blockedRanges[] = [
+                        'start' => $detail->intermediate_time_from ?: $detail->start_time_from,
+                        'end' => $detail->intermediate_time_to ?: $detail->start_time_to
                     ];
                 }
                 if ($detail->end_date === $date) {
@@ -634,7 +641,8 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
                     } elseif ($type === Consecutive::class) {
                         $q->where(function($subQuery) use ($date) {
                             $subQuery->where('start_date', $date)
-                                ->orWhere('end_date', $date);
+                                ->orWhere('end_date', $date)
+                                ->orWhere('intermediate_date', $date);
                         });
                     } elseif ($type === Multiple::class) {
                         $q->where(function($subQuery) use ($date) {
@@ -674,6 +682,12 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
                 $blockedRanges[] = [
                     'start' => $detail->start_time_from,
                     'end' => $detail->start_time_to
+                ];
+            }
+            if ($detail->intermediate_date === $date) {
+                $blockedRanges[] = [
+                    'start' => $detail->intermediate_time_from ?: $detail->start_time_from,
+                    'end' => $detail->intermediate_time_to ?: $detail->start_time_to
                 ];
             }
             if ($detail->end_date === $date) {
@@ -724,7 +738,7 @@ Route::get('/api/time-availability/{facilityId}', function($facilityId) {
     // Function to check if a time is blocked
     function isTimeBlocked($time, $blockedRanges) {
         foreach ($blockedRanges as $range) {
-            if ($time >= $range['start'] && $time <= $range['end']) {
+            if ($time >= $range['start'] && $time < $range['end']) {
                 return true;
             }
         }
